@@ -3,7 +3,7 @@ services:
     name: anzen-trading-api-demo
     runtime: node
     plan: free
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build
     startCommand: pnpm start:prod
     healthCheckPath: /api/health
     envVars:
