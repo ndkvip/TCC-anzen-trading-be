@@ -52,6 +52,33 @@ export class MediaService {
     return { deleted: assets.length };
   }
 
+  async removeFeaturedMedia(urls: string[]) {
+    if (!urls.length) return;
+    const assets = await this.repo.find({
+      where: {
+        contextType: MediaContextType.FEATURED_TRADE,
+        remoteUrl: In(urls),
+      },
+    });
+    for (const asset of assets) {
+      if (asset.driveFileId) await this.drive.remove(asset.driveFileId);
+      await this.repo.remove(asset);
+    }
+  }
+
+  async downloadFeaturedImage(fileId: string) {
+    const asset = await this.repo.findOne({
+      where: {
+        driveFileId: fileId,
+        contextType: MediaContextType.FEATURED_TRADE,
+      },
+    });
+    if (!asset)
+      throw new NotFoundException('Ảnh giao dịch nổi bật không tồn tại');
+    const image = await this.drive.download(fileId);
+    return { buffer: image.buffer, mimeType: asset.mimeType || image.mimeType };
+  }
+
   async downloadLearningImage(fileId: string, lessonId: string) {
     // A lesson can contain knowledge, question, and answer images. The file ID
     // is unique in Drive, so scope the lookup to this lesson and all learning

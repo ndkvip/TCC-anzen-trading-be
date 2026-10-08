@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   Optional,
+  Logger,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { access, mkdir, rm, writeFile } from 'node:fs/promises';
@@ -16,6 +17,7 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 @Injectable()
 export class FeaturedTradeImagesService {
+  private readonly logger = new Logger(FeaturedTradeImagesService.name);
   constructor(@Optional() private readonly media?: MediaService) {}
 
   private directory() {
@@ -31,20 +33,29 @@ export class FeaturedTradeImagesService {
     }
 
     // Authenticated uploads use Drive as the only backend media source.
-    if (actorOrLegacyWeek && typeof actorOrLegacyWeek !== 'string' && this.media) {
+    if (
+      actorOrLegacyWeek &&
+      typeof actorOrLegacyWeek !== 'string' &&
+      this.media
+    ) {
       const imageUrls: string[] = [];
-      for (const file of files) {
-        this.validate(file);
-        const uploaded = await this.media.upload(
-          actorOrLegacyWeek,
-          {
-            name: file.originalname || `tin-quan-trong-${Date.now()}.webp`,
-            mimeType: 'image/webp',
-            contextType: MediaContextType.FEATURED_TRADE,
-          },
-          file.buffer,
-        );
-        imageUrls.push(uploaded.remoteUrl);
+      files.forEach((file) => this.validate(file));
+      try {
+        for (const file of files) {
+          const uploaded = await this.media.upload(
+            actorOrLegacyWeek,
+            {
+              name: file.originalname || `tin-quan-trong-${Date.now()}.webp`,
+              mimeType: 'image/webp',
+              contextType: MediaContextType.FEATURED_TRADE,
+            },
+            file.buffer,
+          );
+          imageUrls.push(uploaded.remoteUrl);
+        }
+      } catch (error) {
+        await this.remove(imageUrls);
+        throw error;
       }
       return { imageUrls };
     }
@@ -58,9 +69,14 @@ export class FeaturedTradeImagesService {
         for (const file of files) {
           this.validate(file);
           const normalized = await this.normalize(file.buffer);
-          const result = await (this.media as unknown as {
-            upload(buffer: Buffer, options: Record<string, string>): Promise<{ id: string; remoteUrl: string }>;
-          }).upload(normalized, {
+          const result = await (
+            this.media as unknown as {
+              upload(
+                buffer: Buffer,
+                options: Record<string, string>,
+              ): Promise<{ id: string; remoteUrl: string }>;
+            }
+          ).upload(normalized, {
             name: file.originalname || `tin-quan-trong-${Date.now()}.webp`,
             mimeType: 'image/webp',
             folderPath: `Giao dịch nổi bật/${actorOrLegacyWeek}`,
@@ -69,8 +85,13 @@ export class FeaturedTradeImagesService {
           imageUrls.push(result.remoteUrl);
         }
       } catch (error) {
-        const remover = (this.media as unknown as { remove?: (id: string) => Promise<void> }).remove;
-        if (remover) await Promise.all(uploadedIds.map((id) => remover.call(this.media, id)));
+        const remover = (
+          this.media as unknown as { remove?: (id: string) => Promise<void> }
+        ).remove;
+        if (remover)
+          await Promise.all(
+            uploadedIds.map((id) => remover.call(this.media, id)),
+          );
         throw error;
       }
       return { imageUrls };
@@ -134,7 +155,22 @@ export class FeaturedTradeImagesService {
     return path;
   }
 
+  async driveImage(fileId: string) {
+    if (!/^[\w-]{10,200}$/.test(fileId) || !this.media)
+      throw new NotFoundException();
+    return this.media.downloadFeaturedImage(fileId);
+  }
+
   async remove(urls: string[]) {
+    // A temporary Drive outage must not undo a successfully saved article.
+    // Keep the media record so cleanup can be retried.
+    if (this.media?.removeFeaturedMedia) {
+      try {
+        await this.media.removeFeaturedMedia(urls);
+      } catch (error) {
+        this.logger.error('Unable to remove unused featured media', error);
+      }
+    }
     const directory = this.directory();
     await Promise.all(
       urls

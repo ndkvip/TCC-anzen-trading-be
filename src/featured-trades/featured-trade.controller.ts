@@ -59,6 +59,12 @@ export class FeaturedTradeController {
     response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     response.sendFile(await this.images.path(name));
   }
+  @Get('drive-images/:fileId')
+  async driveImage(@Param('fileId') fileId: string, @Res() response: Response) {
+    const image = await this.images.driveImage(fileId);
+    response.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+    response.type(image.mimeType).send(image.buffer);
+  }
   @Post() @UseGuards(JwtAuthGuard, RolesGuard) @Roles(UserRole.ADMIN) create(
     @Body() dto: CreateFeaturedTradeDto,
   ) {

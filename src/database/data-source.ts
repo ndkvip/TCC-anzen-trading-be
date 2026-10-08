@@ -16,6 +16,7 @@ import { FeaturedTrade } from '../featured-trades/featured-trade.entity';
 import { FeaturedTrades20260912000000 } from './migrations/20260912000000-FeaturedTrades';
 import { FeaturedTradeImages20260914000000 } from './migrations/20260914000000-FeaturedTradeImages';
 import { RedNewsCalendarSync20260916000000 } from './migrations/20260916000000-RedNewsCalendarSync';
+import { FeaturedTradeArticles20261007000000 } from './migrations/20261007000000-FeaturedTradeArticles';
 
 export default new DataSource({
   type: 'postgres',
@@ -39,6 +40,7 @@ export default new DataSource({
     FeaturedTrades20260912000000,
     FeaturedTradeImages20260914000000,
     RedNewsCalendarSync20260916000000,
+    FeaturedTradeArticles20261007000000,
   ],
   ssl:
     process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,

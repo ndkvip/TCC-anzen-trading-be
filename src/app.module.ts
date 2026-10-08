@@ -11,6 +11,7 @@ import { DriveMediaFolders20260903000000 } from './database/migrations/202609030
 import { FeaturedTrades20260912000000 } from './database/migrations/20260912000000-FeaturedTrades';
 import { FeaturedTradeImages20260914000000 } from './database/migrations/20260914000000-FeaturedTradeImages';
 import { RedNewsCalendarSync20260916000000 } from './database/migrations/20260916000000-RedNewsCalendarSync';
+import { FeaturedTradeArticles20261007000000 } from './database/migrations/20261007000000-FeaturedTradeArticles';
 import { HealthController } from './health/health.controller';
 import { FeaturedTrade } from './featured-trades/featured-trade.entity';
 import { FeaturedTradesModule } from './featured-trades/featured-trades.module';
@@ -55,6 +56,7 @@ import { UsersModule } from './users/users.module';
           FeaturedTrades20260912000000,
           FeaturedTradeImages20260914000000,
           RedNewsCalendarSync20260916000000,
+          FeaturedTradeArticles20261007000000,
         ],
         migrationsRun: config.get('DATABASE_MIGRATIONS_RUN', 'true') === 'true',
         synchronize: config.get('DATABASE_SYNCHRONIZE', 'false') === 'true',
