@@ -7,6 +7,11 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+export interface JournalNoteOperation {
+  insert: string | { image: string };
+  attributes?: { [key: string]: string | number | boolean };
+}
+
 export enum JournalMode {
   INTRA_DAY = 'INTRA_DAY',
   SWING = 'SWING',
@@ -44,6 +49,8 @@ export class TradeJournal {
     default: () => "'[]'::jsonb",
   })
   processImageUrls!: string[];
+  @Column({ name: 'notes_delta', type: 'jsonb', default: () => "'[]'::jsonb" })
+  notesDelta!: JournalNoteOperation[];
   @Column({ type: 'text', nullable: true }) idea!: string | null;
   @Column({ type: 'text', nullable: true }) execution!: string | null;
   @Column({ type: 'text', nullable: true }) result!: string | null;

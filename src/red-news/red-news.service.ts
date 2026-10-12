@@ -6,7 +6,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Raw, Repository } from 'typeorm';
 import { CreateRedNewsDto } from './dto/create-red-news.dto';
 import { UpdateRedNewsDto } from './dto/update-red-news.dto';
 import { RedNews } from './red-news.entity';
@@ -63,7 +63,12 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
 
   listPublic() {
     return this.news.find({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        currency: Raw((alias) => `UPPER(TRIM(${alias})) = :publicCurrency`, {
+          publicCurrency: 'USD',
+        }),
+      },
       order: { releaseAt: 'ASC' },
     });
   }

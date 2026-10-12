@@ -142,4 +142,44 @@ describe('JournalService Phase 3', () => {
     expect(repository.insert).toHaveBeenCalledTimes(1);
     expect(repository.rows).toHaveLength(1);
   });
+  it('rejects invalid dates, blank symbols and missing intra-day dates', async () => {
+    const service = new JournalService(repo() as never);
+    await expect(
+      service.list('u1', JournalMode.INTRA_DAY, '2026-02-30'),
+    ).rejects.toThrow('Ngày giao dịch không hợp lệ');
+    await expect(
+      service.create('u1', { symbol: '   ', mode: JournalMode.INTRA_DAY }),
+    ).rejects.toThrow('Vui lòng nhập mã tài sản');
+    const rows = [
+      { id: '1', userId: 'u1', mode: JournalMode.SWING, tradeDate: null },
+    ];
+    await expect(
+      new JournalService(repo(rows) as never).update('u1', '1', {
+        mode: JournalMode.INTRA_DAY,
+        tradeDate: null,
+      }),
+    ).rejects.toThrow('Nhật ký trong ngày cần ngày giao dịch');
+  });
+
+  it('persists notes delta and filters summary dates', async () => {
+    const rows: any[] = [];
+    const service = new JournalService(repo(rows) as never);
+    const created = await service.create('u1', {
+      mode: JournalMode.INTRA_DAY,
+      tradeDate: '2026-10-12',
+      symbol: 'BTCUSDT',
+      notesDelta: [{ insert: 'Kế hoạch vào lệnh' }],
+    });
+    expect(created.notesDelta).toEqual([{ insert: 'Kế hoạch vào lệnh' }]);
+    const summary = await service.summary(
+      'u1',
+      JournalMode.INTRA_DAY,
+      '2026-10-12',
+      '2026-10-12',
+    );
+    expect(summary.count).toBe(1);
+    expect(
+      (await service.summary('u1', JournalMode.INTRA_DAY, '2026-10-13')).count,
+    ).toBe(0);
+  });
 });

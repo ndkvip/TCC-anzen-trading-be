@@ -181,6 +181,30 @@ describe('MediaService Drive folder routing', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('allows the image owner and admin but hides other users media', async () => {
+    const { media, drive } = service();
+    await media.register(actor('student-a'), {
+      driveFileId: 'journal-private',
+      contextType: MediaContextType.JOURNAL,
+    });
+    await expect(
+      media.downloadOwnedImage(actor('student-a'), 'journal-private'),
+    ).resolves.toEqual({
+      buffer: Buffer.from('image-bytes'),
+      mimeType: 'image/webp',
+    });
+    await expect(
+      media.downloadOwnedImage(
+        actor('admin', UserRole.ADMIN),
+        'journal-private',
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      media.downloadOwnedImage(actor('student-b'), 'journal-private'),
+    ).rejects.toThrow('Ảnh không tồn tại');
+    expect(drive.download).toHaveBeenCalledTimes(2);
+  });
+
   it('publishes the agreed Google Drive folder contract', () => {
     const { media } = service();
     expect(media.driveConfig()).toEqual({

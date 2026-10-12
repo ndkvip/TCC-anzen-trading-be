@@ -102,4 +102,22 @@ describe('RedNewsService calendar sync', () => {
 
     expect(existing.isActive).toBe(false);
   });
+
+  it('returns only active USD news to the public home feed', async () => {
+    const repository = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+    const service = new RedNewsService(repository as never);
+
+    await service.listPublic();
+
+    const options = repository.find.mock.calls[0][0];
+    expect(options.where.isActive).toBe(true);
+    expect(options.where.currency.getSql?.('red_news.currency')).toBe(
+      'UPPER(TRIM(red_news.currency)) = :publicCurrency',
+    );
+    expect(options.where.currency.objectLiteralParameters).toEqual({
+      publicCurrency: 'USD',
+    });
+  });
 });

@@ -1,3 +1,4 @@
+import { JournalNotes20261012000000 } from './database/migrations/20261012000000-JournalNotes';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -57,6 +58,7 @@ import { UsersModule } from './users/users.module';
           FeaturedTradeImages20260914000000,
           RedNewsCalendarSync20260916000000,
           FeaturedTradeArticles20261007000000,
+          JournalNotes20261012000000,
         ],
         migrationsRun: config.get('DATABASE_MIGRATIONS_RUN', 'true') === 'true',
         synchronize: config.get('DATABASE_SYNCHRONIZE', 'false') === 'true',

@@ -1,4 +1,16 @@
-import { BadRequestException, Body, Controller, Get, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -30,16 +42,39 @@ export class MediaController {
     return this.service.list(user.sub);
   }
 
+  @Get('drive-images/:fileId')
+  async image(
+    @CurrentUser() user: AuthRequestUser,
+    @Param('fileId') fileId: string,
+    @Res() response: Response,
+  ) {
+    const image = await this.service.downloadOwnedImage(user, fileId);
+    response.setHeader('Content-Type', image.mimeType);
+    response.setHeader('Cache-Control', 'private, no-store');
+    response.send(image.buffer);
+  }
+
   @Post('register')
   register(@CurrentUser() user: AuthRequestUser, @Body() dto: MediaDto) {
     return this.service.register(user, dto);
   }
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
-  upload(@CurrentUser() user: AuthRequestUser, @UploadedFile() file: Express.Multer.File, @Body() dto: UploadMediaDto) {
-    if (!file?.buffer) throw new BadRequestException('Vui lòng chọn một tệp hình ảnh');
-    return this.service.upload(user, { ...dto, contextType: dto.contextType ?? MediaContextType.GENERAL }, file.buffer);
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }),
+  )
+  upload(
+    @CurrentUser() user: AuthRequestUser,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: UploadMediaDto,
+  ) {
+    if (!file?.buffer)
+      throw new BadRequestException('Vui lòng chọn một tệp hình ảnh');
+    return this.service.upload(
+      user,
+      { ...dto, contextType: dto.contextType ?? MediaContextType.GENERAL },
+      file.buffer,
+    );
   }
 
   @Get('provider')

@@ -28,6 +28,7 @@ export type JournalInput = Partial<
       | 'timeframePair'
       | 'priceMovement'
       | 'processImageUrls'
+      | 'notesDelta'
       | 'idea'
       | 'execution'
       | 'result'
@@ -42,6 +43,7 @@ export class JournalService {
     private readonly repo: Repository<TradeJournal>,
   ) {}
   async list(userId: string, mode: JournalMode, date?: string) {
+    this.validateQuery(mode, date);
     const where: Record<string, unknown> = { userId, mode };
     if (mode === JournalMode.INTRA_DAY && date) where.tradeDate = date;
     return this.repo.find({
@@ -50,14 +52,21 @@ export class JournalService {
     });
   }
   async summary(userId: string, mode: JournalMode, from?: string, to?: string) {
+    this.validateQuery(mode, from);
+    this.validateQuery(mode, to);
     if (from && to && from > to)
       throw new BadRequestException('Khoảng thời gian không hợp lệ');
     const rows = await this.repo.find({ where: { userId, mode } });
-    const filtered = rows.filter(
-      (row) =>
-        (!from || !row.tradeDate || row.tradeDate >= from) &&
-        (!to || !row.tradeDate || row.tradeDate <= to),
-    );
+    const filtered = rows.filter((row) => {
+      const date =
+        row.tradeDate ??
+        row.entryAt?.toISOString().slice(0, 10) ??
+        row.createdAt?.toISOString().slice(0, 10);
+      return (
+        (!from && !to) ||
+        (!!date && (!from || date >= from) && (!to || date <= to))
+      );
+    });
     const closed = filtered.filter((row) => row.pnl != null);
     const wins = closed.filter((row) => (row.pnl ?? 0) > 0).length;
     const losses = closed.filter((row) => (row.pnl ?? 0) < 0).length;
@@ -100,7 +109,12 @@ export class JournalService {
   async update(userId: string, id: string, input: JournalInput) {
     const row = await this.repo.findOne({ where: { id, userId } });
     if (!row) throw new NotFoundException('Nhật ký không tồn tại');
-    Object.assign(row, this.normalizeUpdate(input));
+    const updated = { ...row, ...this.normalizeUpdate(input) };
+    if (updated.mode === JournalMode.INTRA_DAY && !updated.tradeDate) {
+      throw new BadRequestException('Nhật ký trong ngày cần ngày giao dịch');
+    }
+    if (updated.mode === JournalMode.SWING) updated.tradeDate = null;
+    Object.assign(row, updated);
     return this.repo.save(row);
   }
   async remove(userId: string, id: string) {
@@ -132,6 +146,11 @@ export class JournalService {
     };
   }
   private normalizeUpdate(input: JournalInput) {
+    if (input.symbol !== undefined && !input.symbol?.trim()) {
+      throw new BadRequestException('Vui lòng nhập mã tài sản');
+    }
+    if (input.tradeDate != null)
+      this.validateQuery(input.mode ?? JournalMode.INTRA_DAY, input.tradeDate);
     const { id: _id, ...fields } = input;
     return {
       ...fields,
@@ -148,6 +167,19 @@ export class JournalService {
         : {}),
       ...(input.mode === JournalMode.SWING ? { tradeDate: null } : {}),
     };
+  }
+  private validateQuery(mode: JournalMode, date?: string) {
+    if (!Object.values(JournalMode).includes(mode)) {
+      throw new BadRequestException('Loại nhật ký không hợp lệ');
+    }
+    if (
+      date &&
+      (!/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+        Number.isNaN(Date.parse(date)) ||
+        new Date(date).toISOString().slice(0, 10) !== date)
+    ) {
+      throw new BadRequestException('Ngày giao dịch không hợp lệ');
+    }
   }
   private bestStrategy(rows: TradeJournal[]) {
     const totals = new Map<string, { pnl: number; count: number }>();

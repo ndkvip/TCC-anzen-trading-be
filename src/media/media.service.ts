@@ -32,6 +32,14 @@ export class MediaService {
     return this.repo.find({ where: { ownerId }, order: { createdAt: 'DESC' } });
   }
 
+  async downloadOwnedImage(actor: AuthRequestUser, fileId: string) {
+    const asset = await this.repo.findOne({ where: { driveFileId: fileId } });
+    if (!asset || (actor.role !== UserRole.ADMIN && asset.ownerId !== actor.sub))
+      throw new NotFoundException('Ảnh không tồn tại');
+    const image = await this.drive.download(fileId);
+    return { buffer: image.buffer, mimeType: asset.mimeType || image.mimeType };
+  }
+
   async removeLessonMedia(lessonId: string) {
     const assets = await this.repo.find({
       where: {
