@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Res,
   UploadedFile,
   UseGuards,
@@ -18,6 +19,10 @@ import type { AuthRequestUser } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MediaContextType } from './media-context';
 import { MediaService } from './media.service';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { UserRole } from '../users/user.entity';
+import { MediaQueryDto } from './media-query.dto';
 
 class MediaDto {
   @IsOptional() @IsString() driveFileId?: string;
@@ -40,6 +45,16 @@ export class MediaController {
   @Get()
   list(@CurrentUser() user: AuthRequestUser) {
     return this.service.list(user.sub);
+  }
+
+  @Get('admin/all')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  adminList(
+    @CurrentUser() user: AuthRequestUser,
+    @Query() query: MediaQueryDto,
+  ) {
+    return this.service.adminList(user, query);
   }
 
   @Get('drive-images/:fileId')

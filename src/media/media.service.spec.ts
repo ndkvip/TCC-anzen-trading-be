@@ -43,7 +43,19 @@ function service() {
       return values;
     }),
     findOne: async ({ where }: any) =>
-      rows.find((row) => row.driveFileId === where.driveFileId) ?? null,
+      rows.find((row) => {
+        if (where.driveFileId && row.driveFileId !== where.driveFileId) return false;
+        if (where.ownerId && row.ownerId !== where.ownerId) return false;
+        if (where.localReference && row.localReference !== where.localReference) return false;
+        if (where.contextType?._type === 'in') {
+          if (!where.contextType._value.includes(row.contextType)) return false;
+        } else if (where.contextType && row.contextType !== where.contextType) {
+          return false;
+        }
+        if (where.contextId?._type === 'isNull' && row.contextId !== null) return false;
+        if (typeof where.contextId === 'string' && row.contextId !== where.contextId) return false;
+        return true;
+      }) ?? null,
   };
   const config = {
     get: (key: string) =>
@@ -55,6 +67,15 @@ function service() {
       buffer: Buffer.from('image-bytes'),
       mimeType: 'image/webp',
     }),
+    upload: jest.fn().mockImplementation(async (_buffer: Buffer, input: any) => ({
+      id: `drive-${rows.length + 1}`,
+      name: input.name,
+      mimeType: input.mimeType,
+      webViewLink: 'https://drive.google.com/file/d/test/view',
+      remoteUrl: `https://drive.google.com/uc?export=download&id=drive-${rows.length + 1}`,
+      folderId: 'folder-1',
+      folderPath: input.folderPath,
+    })),
   };
   return {
     rows,
@@ -87,6 +108,38 @@ describe('MediaService Drive folder routing', () => {
     expect(question.folderPath).toBe('Kiến thức/lesson-123/Bài tập/Câu hỏi');
     expect(answer.folderPath).toBe('Kiến thức/lesson-123/Bài tập/Câu trả lời');
     expect(answer.contextId).toBe('lesson-123');
+  });
+
+  it('reuses an uploaded local reference instead of creating a Drive duplicate', async () => {
+    const { media, rows, drive } = service();
+    const student = actor('user-456');
+    const image = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    );
+
+    const first = await media.upload(
+      student,
+      {
+        contextType: MediaContextType.PLAN,
+        name: 'chart.png',
+        localReference: '/offline/chart.png',
+      },
+      image,
+    );
+    const second = await media.upload(
+      student,
+      {
+        contextType: MediaContextType.PLAN,
+        name: 'chart.png',
+        localReference: '/offline/chart.png',
+      },
+      image,
+    );
+
+    expect(second.id).toBe(first.id);
+    expect(rows).toHaveLength(1);
+    expect(drive.upload).toHaveBeenCalledTimes(1);
   });
 
   it('routes journal and plan images into the signed-in user folder', async () => {

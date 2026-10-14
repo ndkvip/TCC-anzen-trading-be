@@ -15,12 +15,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../users/user.entity';
-import { PlanScope } from './plan.entity';
+import { PlanScope, PlanStatus } from './plan.entity';
 import { PlansService } from './plans.service';
 class PlanDto {
   @IsOptional() @IsEnum(PlanScope) scope?: PlanScope;
   @IsOptional() @IsString() periodKey?: string;
   @IsOptional() @IsString() title?: string;
+  @IsOptional() @IsEnum(PlanStatus) status?: PlanStatus;
   @IsOptional() @IsArray() contentDelta?: Record<string, unknown>[];
   @IsOptional() @IsArray() timeframePairs?: string[];
   @IsOptional() @IsArray() imageUrls?: string[];

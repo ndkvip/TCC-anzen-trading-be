@@ -100,8 +100,67 @@ describe('JournalService Phase 3', () => {
         pnl: 150,
         totalR: 1.5,
         bestStrategy: 'AMD',
+        bestStrategyStats: {
+          label: 'Chưa chọn khung · AMD',
+          timeframePair: 'Chưa chọn khung',
+          priceMovement: 'AMD',
+          pnl: 200,
+          totalR: 2,
+          count: 1,
+          wins: 1,
+          winRate: 100,
+        },
       }),
     );
+  });
+
+  it('ranks Swing strategy by timeframe, setup and total PNL', async () => {
+    const rows = [
+      {
+        id: '1',
+        userId: 'u1',
+        mode: JournalMode.SWING,
+        tradeDate: null,
+        pnl: 80,
+        riskReward: 3,
+        timeframePair: 'H4-M15',
+        priceMovement: 'AMD',
+      },
+      {
+        id: '2',
+        userId: 'u1',
+        mode: JournalMode.SWING,
+        tradeDate: null,
+        pnl: 120,
+        riskReward: 2,
+        timeframePair: 'D1-H1',
+        priceMovement: 'AMD',
+      },
+      {
+        id: '3',
+        userId: 'u1',
+        mode: JournalMode.SWING,
+        tradeDate: null,
+        pnl: 40,
+        riskReward: 5,
+        timeframePair: 'D1-H1',
+        priceMovement: 'MMXM',
+      },
+    ];
+    const summary = await new JournalService(repo(rows) as never).summary(
+      'u1',
+      JournalMode.SWING,
+    );
+    expect(summary.bestStrategyStats).toEqual({
+      label: 'D1-H1 · AMD',
+      timeframePair: 'D1-H1',
+      priceMovement: 'AMD',
+      pnl: 120,
+      totalR: 2,
+      count: 1,
+      wins: 1,
+      winRate: 100,
+    });
   });
   it('patches only supplied fields', async () => {
     const rows = [

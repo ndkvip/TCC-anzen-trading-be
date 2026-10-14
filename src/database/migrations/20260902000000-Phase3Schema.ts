@@ -15,6 +15,9 @@ export class Phase3Schema20260902000000 implements MigrationInterface {
       `DO $$ BEGIN CREATE TYPE "trading_plans_scope_enum" AS ENUM ('MONTH','WEEK','DAY'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     );
     await q.query(
+      `DO $$ BEGIN CREATE TYPE "trading_plans_status_enum" AS ENUM ('DRAFT','COMPLETED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    );
+    await q.query(
       `CREATE TABLE IF NOT EXISTS lessons (id uuid PRIMARY KEY DEFAULT uuid_generate_v4(), slug varchar NOT NULL UNIQUE, title varchar NOT NULL, description text NOT NULL DEFAULT '', tier lessons_tier_enum NOT NULL, position integer NOT NULL DEFAULT 0, duration_minutes integer NOT NULL DEFAULT 10, is_published boolean NOT NULL DEFAULT true, knowledge_cards jsonb NOT NULL DEFAULT '[]', questions jsonb NOT NULL DEFAULT '[]', created_at timestamp NOT NULL DEFAULT now(), updated_at timestamp NOT NULL DEFAULT now())`,
     );
     await q.query(
@@ -27,7 +30,7 @@ export class Phase3Schema20260902000000 implements MigrationInterface {
       `CREATE INDEX IF NOT EXISTS idx_trade_journals_user_mode_date ON trade_journals(user_id,mode,trade_date)`,
     );
     await q.query(
-      `CREATE TABLE IF NOT EXISTS trading_plans (id uuid PRIMARY KEY DEFAULT uuid_generate_v4(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, scope trading_plans_scope_enum NOT NULL, period_key varchar NOT NULL, title varchar NOT NULL, content_delta jsonb NOT NULL DEFAULT '[]', timeframe_pairs jsonb NOT NULL DEFAULT '[]', inherited_plan_id uuid, image_urls jsonb NOT NULL DEFAULT '[]', created_at timestamp NOT NULL DEFAULT now(), updated_at timestamp NOT NULL DEFAULT now(), UNIQUE(user_id,scope,period_key))`,
+      `CREATE TABLE IF NOT EXISTS trading_plans (id uuid PRIMARY KEY DEFAULT uuid_generate_v4(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, scope trading_plans_scope_enum NOT NULL, period_key varchar NOT NULL, title varchar NOT NULL, status trading_plans_status_enum NOT NULL DEFAULT 'DRAFT', content_delta jsonb NOT NULL DEFAULT '[]', timeframe_pairs jsonb NOT NULL DEFAULT '[]', inherited_plan_id uuid, image_urls jsonb NOT NULL DEFAULT '[]', created_at timestamp NOT NULL DEFAULT now(), updated_at timestamp NOT NULL DEFAULT now(), UNIQUE(user_id,scope,period_key))`,
     );
     await q.query(
       `CREATE TABLE IF NOT EXISTS daily_checkins (id uuid PRIMARY KEY DEFAULT uuid_generate_v4(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, checkin_date date NOT NULL, scores jsonb NOT NULL, total_score double precision NOT NULL, created_at timestamp NOT NULL DEFAULT now(), updated_at timestamp NOT NULL DEFAULT now(), UNIQUE(user_id,checkin_date))`,
@@ -48,6 +51,7 @@ export class Phase3Schema20260902000000 implements MigrationInterface {
       await q.query(`DROP TABLE IF EXISTS ${table}`);
     for (const type of [
       'trading_plans_scope_enum',
+      'trading_plans_status_enum',
       'trade_journals_direction_enum',
       'trade_journals_mode_enum',
       'lessons_tier_enum',

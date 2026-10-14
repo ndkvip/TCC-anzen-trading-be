@@ -6,9 +6,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import type { AuthRequestUser } from '../auth/auth.types';
-import { UserRole } from '../users/user.entity';
+import { User, UserRole } from '../users/user.entity';
+import { MediaQueryDto } from './media-query.dto';
 import { MediaAsset } from './media-asset.entity';
 import {
   driveFolderLayout,
@@ -32,9 +33,60 @@ export class MediaService {
     return this.repo.find({ where: { ownerId }, order: { createdAt: 'DESC' } });
   }
 
+  async adminList(actor: AuthRequestUser, input: MediaQueryDto) {
+    if (actor.role !== UserRole.ADMIN) throw new ForbiddenException();
+    const query = this.repo
+      .createQueryBuilder('asset')
+      .leftJoin(User, 'owner', 'owner.id = asset.ownerId')
+      .addSelect('owner.name', 'ownerName')
+      .addSelect('owner.email', 'ownerEmail');
+    if (input.ownerId)
+      query.andWhere('asset.ownerId = :ownerId', { ownerId: input.ownerId });
+    if (input.contextType)
+      query.andWhere('asset.contextType = :contextType', {
+        contextType: input.contextType,
+      });
+    if (input.search?.trim()) {
+      // Treat wildcard characters as text, not arbitrary ILIKE patterns.
+      const search = `%${input.search.trim().replace(/[\\%_]/g, '\\$&')}%`;
+      query.andWhere(
+        `(asset.name ILIKE :search OR asset.driveFileId ILIKE :search OR asset.folderPath ILIKE :search OR owner.name ILIKE :search OR owner.email ILIKE :search)`,
+        { search },
+      );
+    }
+    const total = await query.getCount();
+    const { entities, raw } = await query
+      .orderBy('asset.createdAt', 'DESC')
+      .addOrderBy('asset.id', 'DESC')
+      .offset((input.page - 1) * input.pageSize)
+      .limit(input.pageSize)
+      .getRawAndEntities();
+    return {
+      data: entities.map((asset, index) => ({
+        ...asset,
+        owner: {
+          id: asset.ownerId,
+          name: raw[index]?.ownerName ?? null,
+          email: raw[index]?.ownerEmail ?? null,
+        },
+        // Only acknowledged uploads are present in the server catalogue.
+        storageStatus: asset.driveFileId ? 'DRIVE' : 'EXTERNAL',
+        previewPath: asset.driveFileId
+          ? `/media/drive-images/${encodeURIComponent(asset.driveFileId)}`
+          : null,
+      })),
+      total,
+      page: input.page,
+      pageSize: input.pageSize,
+    };
+  }
+
   async downloadOwnedImage(actor: AuthRequestUser, fileId: string) {
     const asset = await this.repo.findOne({ where: { driveFileId: fileId } });
-    if (!asset || (actor.role !== UserRole.ADMIN && asset.ownerId !== actor.sub))
+    if (
+      !asset ||
+      (actor.role !== UserRole.ADMIN && asset.ownerId !== actor.sub)
+    )
       throw new NotFoundException('Ảnh không tồn tại');
     const image = await this.drive.download(fileId);
     return { buffer: image.buffer, mimeType: asset.mimeType || image.mimeType };
@@ -137,6 +189,26 @@ export class MediaService {
         'Chỉ quản trị viên được đăng ảnh cho bài học',
       );
     const folder = resolveMediaFolder(actor.sub, contextType, input.lessonId);
+    const localReference = input.localReference?.trim();
+    if (localReference) {
+      // Mobile retries the same local file after a lost response. Reuse the
+      // existing Drive asset instead of creating duplicate files.
+      const baseWhere = {
+        ownerId: actor.sub,
+        localReference,
+        contextType: folder.contextType,
+      };
+      const existing = folder.contextId
+        ? await this.repo.findOne({
+            where: { ...baseWhere, contextId: folder.contextId },
+          })
+        : await this.repo.findOne({
+            // TypeORM's nullable column type is narrower than its IsNull
+            // operator in this version, so keep the operator boundary local.
+            where: { ...baseWhere, contextId: IsNull() } as never,
+          });
+      if (existing) return existing;
+    }
     const result = await this.drive.upload(normalizedBuffer, {
       name: `${(input.name?.trim() || `image-${Date.now()}`).replace(/\.[^.]+$/, '')}.webp`,
       mimeType: 'image/webp',
@@ -152,7 +224,7 @@ export class MediaService {
         mimeType: result.mimeType,
         remoteUrl: result.remoteUrl,
         thumbnailUrl: result.remoteUrl,
-        localReference: input.localReference || null,
+        localReference: localReference || null,
         sizeBytes: String(normalizedBuffer.byteLength),
         contextType: folder.contextType,
         contextId: folder.contextId,

@@ -1,13 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PlanScope, TradingPlan } from './plan.entity';
+import { PlanScope, PlanStatus, TradingPlan } from './plan.entity';
 export type PlanInput = Partial<
   Pick<
     TradingPlan,
     | 'scope'
     | 'periodKey'
     | 'title'
+    | 'status'
     | 'contentDelta'
     | 'timeframePairs'
     | 'imageUrls'
@@ -37,6 +38,7 @@ export class PlansService {
       scope,
       periodKey,
       title: this.title(scope, periodKey),
+      status: PlanStatus.DRAFT,
       contentDelta: inherited?.contentDelta ?? [],
       timeframePairs: [],
       inheritedPlanId: inherited?.id ?? null,
@@ -51,6 +53,7 @@ export class PlansService {
     row ??= this.repo.create({ userId, scope, periodKey });
     Object.assign(row, {
       title: input.title ?? this.title(scope, periodKey),
+      status: input.status ?? row.status ?? PlanStatus.DRAFT,
       contentDelta: input.contentDelta ?? [],
       timeframePairs: input.timeframePairs ?? [],
       imageUrls: input.imageUrls ?? [],

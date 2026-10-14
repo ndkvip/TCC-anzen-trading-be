@@ -1,4 +1,4 @@
-import { PlanScope } from './plan.entity';
+import { PlanScope, PlanStatus } from './plan.entity';
 import { PlansService } from './plans.service';
 function repo(rows: any[] = []) {
   return {
@@ -57,6 +57,26 @@ describe('PlansService Phase 3', () => {
     expect((await s.list('u2')).length).toBe(0);
     expect((await s.get('u1', PlanScope.DAY, '2026-09-03')).title).not.toBe(
       'A',
+    );
+  });
+  it('persists draft/completed status independently for each period', async () => {
+    const r = repo();
+    const s = new PlansService(r as never);
+    const draft = await s.upsert('u1', {
+      scope: PlanScope.DAY,
+      periodKey: '2026-09-09',
+      status: PlanStatus.DRAFT,
+    });
+    expect(draft.status).toBe(PlanStatus.DRAFT);
+
+    const completed = await s.upsert('u1', {
+      scope: PlanScope.DAY,
+      periodKey: '2026-09-09',
+      status: PlanStatus.COMPLETED,
+    });
+    expect(completed.status).toBe(PlanStatus.COMPLETED);
+    expect((await s.get('u1', PlanScope.DAY, '2026-09-09')).status).toBe(
+      PlanStatus.COMPLETED,
     );
   });
 });

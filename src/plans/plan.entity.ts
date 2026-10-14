@@ -11,6 +11,10 @@ export enum PlanScope {
   WEEK = 'WEEK',
   DAY = 'DAY',
 }
+export enum PlanStatus {
+  DRAFT = 'DRAFT',
+  COMPLETED = 'COMPLETED',
+}
 @Entity({ name: 'trading_plans' })
 @Index(['userId', 'scope', 'periodKey'], { unique: true })
 export class TradingPlan {
@@ -19,6 +23,8 @@ export class TradingPlan {
   @Column({ type: 'enum', enum: PlanScope }) scope!: PlanScope;
   @Column({ name: 'period_key' }) periodKey!: string;
   @Column() title!: string;
+  @Column({ type: 'enum', enum: PlanStatus, default: PlanStatus.DRAFT })
+  status!: PlanStatus;
   @Column({
     name: 'content_delta',
     type: 'jsonb',

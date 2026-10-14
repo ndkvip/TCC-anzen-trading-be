@@ -1,4 +1,5 @@
 import { JournalNotes20261012000000 } from './migrations/20261012000000-JournalNotes';
+import { PlanStatus20261014000000 } from './migrations/20261014000000-PlanStatus';
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { DailyCheckin } from '../checkins/checkin.entity';
@@ -43,6 +44,7 @@ export default new DataSource({
     RedNewsCalendarSync20260916000000,
     FeaturedTradeArticles20261007000000,
     JournalNotes20261012000000,
+    PlanStatus20261014000000,
   ],
   ssl:
     process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,

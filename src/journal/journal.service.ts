@@ -36,6 +36,18 @@ export type JournalInput = Partial<
     'entryAt'
   >
 > & { entryAt?: string | Date | null; id?: string };
+
+type StrategyStats = {
+  label: string;
+  timeframePair: string;
+  priceMovement: string;
+  pnl: number;
+  totalR: number;
+  count: number;
+  wins: number;
+  winRate: number;
+};
+
 @Injectable()
 export class JournalService {
   constructor(
@@ -82,6 +94,7 @@ export class JournalService {
       pnl: closed.reduce((sum, row) => sum + (row.pnl ?? 0), 0),
       totalR: closed.reduce((sum, row) => sum + (row.riskReward ?? 0), 0),
       bestStrategy: this.bestStrategy(closed),
+      bestStrategyStats: this.bestStrategyStats(closed),
     };
   }
   async create(userId: string, input: JournalInput) {
@@ -182,16 +195,49 @@ export class JournalService {
     }
   }
   private bestStrategy(rows: TradeJournal[]) {
-    const totals = new Map<string, { pnl: number; count: number }>();
+    return this.bestStrategyStats(rows)?.priceMovement ?? null;
+  }
+
+  private bestStrategyStats(rows: TradeJournal[]): StrategyStats | null {
+    const totals = new Map<
+      string,
+      {
+        timeframePair: string;
+        priceMovement: string;
+        pnl: number;
+        totalR: number;
+        count: number;
+        wins: number;
+      }
+    >();
     for (const row of rows) {
-      const key = row.priceMovement || 'Chưa phân loại';
-      const item = totals.get(key) ?? { pnl: 0, count: 0 };
+      const timeframePair = row.timeframePair || 'Chưa chọn khung';
+      const priceMovement = row.priceMovement || 'Chưa phân loại';
+      const key = `${timeframePair}|${priceMovement}`;
+      const item = totals.get(key) ?? {
+        timeframePair,
+        priceMovement,
+        pnl: 0,
+        totalR: 0,
+        count: 0,
+        wins: 0,
+      };
       item.pnl += row.pnl ?? 0;
+      item.totalR += row.riskReward ?? 0;
       item.count += 1;
+      if ((row.pnl ?? 0) > 0) item.wins += 1;
       totals.set(key, item);
     }
-    return (
-      [...totals.entries()].sort((a, b) => b[1].pnl - a[1].pnl)[0]?.[0] ?? null
-    );
+    const best = [...totals.values()].sort((a, b) => {
+      if (b.pnl !== a.pnl) return b.pnl - a.pnl;
+      if (b.totalR !== a.totalR) return b.totalR - a.totalR;
+      return b.count - a.count;
+    })[0];
+    if (!best) return null;
+    return {
+      ...best,
+      label: `${best.timeframePair} · ${best.priceMovement}`,
+      winRate: best.count ? (best.wins / best.count) * 100 : 0,
+    };
   }
 }
