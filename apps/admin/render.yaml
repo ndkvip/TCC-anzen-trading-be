@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: anzen-trading-admin-demo
+    runtime: static
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build
+    staticPublishPath: out
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false

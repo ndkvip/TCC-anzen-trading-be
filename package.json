@@ -1,0 +1,16 @@
+{
+  "name": "anzen-trading",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev:api": "pnpm --dir apps/api start:dev",
+    "dev:admin": "pnpm --dir apps/admin dev",
+    "build:api": "pnpm --dir apps/api build",
+    "build:admin": "pnpm --dir apps/admin build",
+    "lint": "pnpm --dir apps/api lint && pnpm --dir apps/admin lint && (cd apps/mobile && flutter analyze)",
+    "test": "pnpm --dir apps/api test --runInBand && (cd apps/mobile && flutter test)",
+    "db:migrate": "pnpm --dir apps/api migration:run",
+    "db:migration:show": "pnpm --dir apps/api migration:show",
+    "dev:local": "bash scripts/local-dev.sh"
+  }
+}

@@ -1,0 +1,68 @@
+:root {
+  /* ANZEN TRADING brand palette sampled from the navy, cyan and gold logo. */
+  --canvas: #eef3f7;
+  --surface: #ffffff;
+  --ink: #102f49;
+  --muted: #687c8d;
+  --line: #d8e3ea;
+  --green: #1d6388;
+  --green-dark: #0c304d;
+  --lime: #d8b75f;
+  --coral: #d66b52;
+  --blue: #3b8fab;
+  --yellow: #d8b75f;
+  --success: #27845f;
+}
+
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/BeVietnamPro-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/BeVietnamPro-Medium.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/BeVietnamPro-SemiBold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/BeVietnamPro-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Be Vietnam Pro";
+  src: url("/fonts/BeVietnamPro-ExtraBold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
+
+* { box-sizing: border-box; padding: 0; margin: 0; }
+html, body { min-height: 100%; }
+body {
+  color: var(--ink);
+  background: var(--canvas);
+  font-family: "Be Vietnam Pro", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; }
+button, a { color: inherit; }
+button { cursor: pointer; }
+a { text-decoration: none; }

@@ -1,0 +1,6 @@
+appId: vn.ttcict.ttcIctMobile
+---
+- tapOn:
+    point: "37%,95%"
+- waitForAnimationToEnd
+- takeScreenshot: ../../.artifacts/design-shots/02-login

@@ -1,0 +1,5 @@
+appId: vn.ttcict.ttcIctMobile
+---
+- tapOn:
+    point: "285,255"
+- waitForAnimationToEnd

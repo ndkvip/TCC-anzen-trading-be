@@ -1,0 +1,6 @@
+appId: vn.ttcict.ttcIctMobile
+---
+- tapOn:
+    point: "286,790"
+- waitForAnimationToEnd
+- takeScreenshot: plan-redesign
