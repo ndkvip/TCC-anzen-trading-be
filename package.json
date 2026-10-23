@@ -11,6 +11,8 @@
     "test": "pnpm --dir apps/api test --runInBand && (cd apps/mobile && flutter test)",
     "db:migrate": "pnpm --dir apps/api migration:run",
     "db:migration:show": "pnpm --dir apps/api migration:show",
-    "dev:local": "bash scripts/local-dev.sh"
+    "dev:local": "bash scripts/local-dev.sh",
+    "build": "pnpm --dir apps/api build",
+    "start:prod": "pnpm --dir apps/api start:prod"
   }
 }
