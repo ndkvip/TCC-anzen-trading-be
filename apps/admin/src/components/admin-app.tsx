@@ -2261,6 +2261,8 @@ type FeaturedTradeEditorBlock = FeaturedTradeBlock & {
 };
 type FeaturedTradeDraft = Omit<FeaturedTrade, "contentBlocks"> & {
   contentBlocks: FeaturedTradeEditorBlock[];
+  coverImageFile?: File;
+  coverImagePreviewUrl?: string;
 };
 
 function FeaturedTradesPanel({ session }: { session: Session }) {
@@ -2403,6 +2405,30 @@ function FeaturedTradesPanel({ session }: { session: Session }) {
     });
   }
 
+  function addCoverImage(file: File | null) {
+    if (!file || !editing) return;
+    if (!file.type.startsWith("image/")) {
+      setMessage("Chỉ được chọn tệp hình ảnh cho thumbnail.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setMessage("Ảnh thumbnail không được vượt quá 10 MB.");
+      return;
+    }
+    if (editing.coverImagePreviewUrl) {
+      URL.revokeObjectURL(editing.coverImagePreviewUrl);
+      previews.current.delete(editing.coverImagePreviewUrl);
+    }
+    const previewUrl = URL.createObjectURL(file);
+    previews.current.add(previewUrl);
+    setMessage("");
+    setEditing({
+      ...editing,
+      coverImageFile: file,
+      coverImagePreviewUrl: previewUrl,
+    });
+  }
+
   function patchBlock(index: number, patch: Partial<FeaturedTradeEditorBlock>) {
     setEditing((current) =>
       current
@@ -2458,6 +2484,10 @@ function FeaturedTradesPanel({ session }: { session: Session }) {
       setMessage("Thêm ít nhất một khối chữ hoặc hình ảnh.");
       return;
     }
+    if (!editing.coverImageFile && !editing.coverImageUrl?.trim()) {
+      setMessage("Thêm ảnh thumbnail để hiển thị bài viết bên ngoài Home.");
+      return;
+    }
     if (
       editing.contentBlocks.some(
         (block) => block.type === "text" && !block.text?.trim(),
@@ -2468,6 +2498,27 @@ function FeaturedTradesPanel({ session }: { session: Session }) {
     }
     setSaving(true);
     try {
+      let coverImageUrl = editing.coverImageUrl?.trim() ?? "";
+      if (editing.coverImageFile) {
+        setMessage("Đang tải ảnh thumbnail Home...");
+        const uploaded = await api.uploadFeaturedTradeImages(
+          session.accessToken,
+          [editing.coverImageFile],
+          editing.weekStart,
+        );
+        coverImageUrl = uploaded.imageUrls[0] ?? "";
+        if (!coverImageUrl)
+          throw new Error("Máy chủ chưa trả về ảnh thumbnail đã tải lên.");
+        setEditing((current) =>
+          current
+            ? {
+                ...current,
+                coverImageUrl,
+                coverImageFile: undefined,
+              }
+            : current,
+        );
+      }
       const uploadedBlocks: FeaturedTradeBlock[] = [];
       const uploadCount = editing.contentBlocks.filter(
         (block) => block.file,
@@ -2500,9 +2551,7 @@ function FeaturedTradesPanel({ session }: { session: Session }) {
         weekStart: editing.weekStart,
         title: editing.title.trim(),
         summary: editing.summary?.trim() || "",
-        coverImageUrl:
-          uploadedBlocks.find((block) => block.type === "image")?.imageUrl ??
-          "",
+        coverImageUrl,
         contentBlocks: uploadedBlocks,
         isActive: editing.isActive,
       };
@@ -2523,10 +2572,14 @@ function FeaturedTradesPanel({ session }: { session: Session }) {
       setEditing(null);
       setMessage("Đã lưu bài viết.");
     } catch (error) {
-      setMessage(
+      const detail =
         error instanceof Error
           ? error.message
-          : "Không lưu được giao dịch nổi bật",
+          : "Không lưu được giao dịch nổi bật";
+      setMessage(
+        /invalid_grant|Token has been expired or revoked/i.test(detail)
+          ? "Không tải được ảnh vì kết nối Google Drive đã hết hạn hoặc bị thu hồi. Cần kết nối lại Google Drive trên máy chủ. Nội dung đang sửa vẫn được giữ trong cửa sổ này."
+          : detail,
       );
     } finally {
       setSaving(false);
@@ -2609,6 +2662,16 @@ function FeaturedTradesPanel({ session }: { session: Session }) {
                 </div>
                 <h3>{item.title || "Giao dịch nổi bật"}</h3>
                 {item.summary && <p>{item.summary}</p>}
+                {item.coverImageUrl && (
+                  <Image
+                    className={styles.featuredTradeCoverCardImage}
+                    src={featuredImageUrl(item.coverImageUrl)}
+                    alt="Thumbnail trên Home"
+                    width={800}
+                    height={420}
+                    unoptimized
+                  />
+                )}
                 <div className={styles.featuredTradeArticlePreview}>
                   {articleBlocks(item).map((block, index) =>
                     block.type === "text" ? (
@@ -2699,6 +2762,51 @@ function FeaturedTradesPanel({ session }: { session: Session }) {
                 disabled={saving}
               />
             </label>
+            <div className={styles.featuredTradeCoverPicker}>
+              <div className={styles.featuredTradeCoverHeader}>
+                <div>
+                  <strong>Ảnh thumbnail trên Home</strong>
+                  <span>
+                    Ảnh này hiển thị ở thẻ bên ngoài; ảnh trong bài viết được
+                    quản lý riêng bên dưới.
+                  </span>
+                </div>
+                <label className={styles.secondaryButton}>
+                  <Upload size={15} />
+                  {editing.coverImageFile || editing.coverImageUrl
+                    ? "Đổi thumbnail"
+                    : "Chọn thumbnail"}
+                  <input
+                    type="file"
+                    aria-label="Chọn ảnh thumbnail trên Home"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(event) => {
+                      addCoverImage(event.target.files?.[0] ?? null);
+                      event.currentTarget.value = "";
+                    }}
+                    disabled={saving}
+                  />
+                </label>
+              </div>
+              {editing.coverImagePreviewUrl || editing.coverImageUrl ? (
+                <Image
+                  className={styles.featuredTradeCoverPreview}
+                  src={
+                    editing.coverImagePreviewUrl ??
+                    featuredImageUrl(editing.coverImageUrl ?? "")
+                  }
+                  alt="Ảnh thumbnail trên Home"
+                  width={800}
+                  height={420}
+                  unoptimized
+                />
+              ) : (
+                <div className={styles.featuredTradeCoverEmpty}>
+                  Chưa có thumbnail. Hãy chọn một ảnh để hiển thị bài viết
+                  trên Home.
+                </div>
+              )}
+            </div>
             <div className={styles.featuredTradeBlockToolbar}>
               <strong>Nội dung bài viết</strong>
               <span>Thêm theo đúng thứ tự muốn hiển thị</span>

@@ -41,6 +41,29 @@ void main() {
       );
     },
   );
+  test('keeps the Home thumbnail separate from inline article images', () {
+    final trade = FeaturedTrade.fromJson({
+      'id': 'cover',
+      'coverImageUrl':
+          'https://drive.google.com/uc?export=download&id=cover-file-123',
+      'contentBlocks': [
+        {'type': 'text', 'text': 'Phân tích'},
+        {
+          'type': 'image',
+          'imageUrl':
+              'https://drive.google.com/uc?export=download&id=inline-file-456',
+        },
+      ],
+    });
+
+    expect(
+      trade.previewImage,
+      '${ApiClient.baseUrl}/featured-trades/drive-images/cover-file-123',
+    );
+    expect(trade.imageUrls, [
+      '${ApiClient.baseUrl}/featured-trades/drive-images/inline-file-456',
+    ]);
+  });
   test(
     'repository loads articles, keeps last success offline and clears on empty response',
     () async {

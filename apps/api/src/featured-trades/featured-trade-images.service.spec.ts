@@ -1,5 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import sharp from 'sharp';
+import type { AuthRequestUser } from '../auth/auth.types';
+import { AccountTier, LearningTier, UserRole } from '../users/user.entity';
 import { FeaturedTradeImagesService } from './featured-trade-images.service';
 import { GoogleDriveService } from '../media/google-drive.service';
 
@@ -113,5 +115,64 @@ describe('FeaturedTradeImagesService', () => {
       ),
     ).rejects.toThrow('Drive down');
     expect(remove).toHaveBeenCalledWith('drive-file-1');
+  });
+
+  it('uses MediaService for authenticated uploads and preserves the original file buffer', async () => {
+    const mediaUpload = jest.fn().mockResolvedValue({
+      remoteUrl: 'https://drive.google.com/uc?export=download&id=drive-file-2',
+    });
+    const media = {
+      upload: mediaUpload,
+      removeFeaturedMedia: jest.fn(),
+    };
+    const authenticatedService = new FeaturedTradeImagesService(
+      media as never,
+    );
+    const actor: AuthRequestUser = {
+      sub: 'admin-id',
+      email: 'admin@anzen.test',
+      name: 'Admin',
+      role: UserRole.ADMIN,
+      accountTier: AccountTier.STANDARD,
+      learningTier: LearningTier.BASIC,
+      deviceId: 'device-id',
+      tokenVersion: 0,
+      type: 'access',
+    };
+    const input = await sharp({
+      create: {
+        width: 24,
+        height: 16,
+        channels: 3,
+        background: { r: 34, g: 85, b: 55 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+    const result = await authenticatedService.upload(
+      [
+        {
+          buffer: input,
+          size: input.length,
+          mimetype: 'image/png',
+          originalname: 'thumbnail.png',
+        } as Express.Multer.File,
+      ],
+      actor,
+    );
+
+    expect(result.imageUrls).toEqual([
+      'https://drive.google.com/uc?export=download&id=drive-file-2',
+    ]);
+    expect(mediaUpload).toHaveBeenCalledWith(
+      actor,
+      {
+        name: 'thumbnail.png',
+        mimeType: 'image/webp',
+        contextType: 'FEATURED_TRADE',
+      },
+      input,
+    );
   });
 });
