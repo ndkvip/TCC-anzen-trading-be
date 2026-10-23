@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -28,6 +29,7 @@ const base64Url = (value: string | Buffer) =>
 
 @Injectable()
 export class GoogleDriveService {
+  private readonly logger = new Logger(GoogleDriveService.name);
   private accessToken: { value: string; expiresAt: number } | null = null;
   private readonly folderCache = new Map<string, string>();
 
@@ -234,7 +236,23 @@ export class GoogleDriveService {
     const clientSecret = this.config.get<string>('GOOGLE_DRIVE_CLIENT_SECRET');
     const refreshToken = this.config.get<string>('GOOGLE_DRIVE_REFRESH_TOKEN');
     if (clientId && clientSecret && refreshToken) {
-      return this.getOAuthAccessToken(clientId, clientSecret, refreshToken);
+      try {
+        return await this.getOAuthAccessToken(
+          clientId,
+          clientSecret,
+          refreshToken,
+        );
+      } catch (error) {
+        // A revoked OAuth refresh token should not block a valid service account.
+        const hasServiceAccount = Boolean(
+          this.config.get('GOOGLE_DRIVE_CLIENT_EMAIL') &&
+            this.config.get('GOOGLE_DRIVE_PRIVATE_KEY'),
+        );
+        if (!hasServiceAccount) throw error;
+        this.logger.warn(
+          'Google Drive OAuth failed; falling back to service account credentials',
+        );
+      }
     }
 
     const email = this.config.get<string>('GOOGLE_DRIVE_CLIENT_EMAIL');
