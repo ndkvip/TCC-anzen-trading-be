@@ -57,33 +57,12 @@ services:
       - key: GOOGLE_DRIVE_PRIVATE_KEY
         sync: false
       - key: FOREX_FACTORY_SYNC_ENABLED
-        value: "false"
+        value: "true"
       - key: FOREX_FACTORY_SYNC_INTERVAL_MINUTES
         value: "30"
       - key: FOREX_FACTORY_CALENDAR_URL
         value: https://nfs.faireconomy.media/ff_calendar_thisweek.json
 
-  - type: cron
-    name: anzen-trading-red-news-sync-demo
-    runtime: node
-    schedule: "0 1 * * *"
-    rootDir: apps/api
-    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build
-    startCommand: pnpm sync:red-news
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        fromService:
-          name: anzen-trading-api-demo
-          type: web
-          envVarKey: DATABASE_URL
-      - key: DATABASE_SSL
-        value: "true"
-      - key: FOREX_FACTORY_SYNC_ENABLED
-        value: "true"
-      - key: FOREX_FACTORY_CALENDAR_URL
-        value: https://nfs.faireconomy.media/ff_calendar_thisweek.json
 
   - type: web
     name: anzen-trading-admin-demo

@@ -1,0 +1,37 @@
+name: Refresh demo red news
+
+on:
+  schedule:
+    # 08:00 Asia/Ho_Chi_Minh (UTC+7) every day.
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake API and refresh calendar
+        shell: bash
+        run: |
+          set -euo pipefail
+          health_url="https://anzen-trading-api-demo.onrender.com/api/health"
+          news_url="https://anzen-trading-api-demo.onrender.com/api/red-news"
+
+          for attempt in {1..18}; do
+            status="$(curl --silent --show-error --output /tmp/health.json --write-out '%{http_code}' --max-time 30 "$health_url" || true)"
+            if [[ "$status" == "200" ]]; then
+              cat /tmp/health.json
+              break
+            fi
+            if [[ "$attempt" == "18" ]]; then
+              echo "API did not become healthy (HTTP $status)" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+
+          # The API performs the calendar sync on startup and keeps a 30-minute
+          # background refresh while awake. This request verifies the public data path.
+          curl --fail --silent --show-error --max-time 30 "$news_url" >/tmp/red-news.json
+          node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('/tmp/red-news.json','utf8')); console.log('Public red-news records:', data.length);"
