@@ -29,9 +29,11 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
     private readonly news: Repository<RedNews>,
   ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
     if (this.syncEnabled) {
-      void this.syncFromCalendar();
+      // Finish the first refresh before health checks pass so a scheduled wake
+      // always updates the public feed before the app reads it.
+      await this.syncFromCalendar();
       this.syncTimer = setInterval(
         () => void this.syncFromCalendar(),
         this.syncIntervalMs,
