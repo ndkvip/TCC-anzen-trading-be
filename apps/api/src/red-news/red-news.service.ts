@@ -63,6 +63,13 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  private get calendarFallbackUrl() {
+    return (
+      process.env.FOREX_FACTORY_CALENDAR_FALLBACK_URL ??
+      'https://r.jina.ai/http://nfs.faireconomy.media/ff_calendar_thisweek.json'
+    );
+  }
+
   listPublic() {
     return this.news.find({
       where: {
@@ -84,16 +91,7 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
       return { synced: 0, skipped: true };
     this.syncInProgress = true;
     try {
-      const response = await fetch(this.calendarUrl, {
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': 'ANZEN-TRADING-calendar-sync/1.0',
-        },
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (!response.ok) throw new Error(`calendar HTTP ${response.status}`);
-      const payload = (await response.json()) as unknown;
-      const events = Array.isArray(payload) ? payload : [];
+      const events = await this.fetchCalendarEvents();
       let synced = 0;
       for (const event of events) {
         const item = this.toImportantEvent(event);
@@ -138,6 +136,72 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.syncInProgress = false;
     }
+  }
+
+  private async fetchCalendarEvents(): Promise<unknown[]> {
+    const urls = [this.calendarUrl, this.calendarFallbackUrl].filter(
+      (url, index, all) => Boolean(url) && all.indexOf(url) === index,
+    );
+    let lastError: unknown;
+
+    for (const [index, url] of urls.entries()) {
+      try {
+        const response = await fetch(url, {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'ANZEN-TRADING-calendar-sync/1.0',
+          },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!response.ok) throw new Error(`calendar HTTP ${response.status}`);
+
+        const raw = await this.readResponseBody(response);
+        const events = this.parseCalendarEvents(raw);
+        if (index > 0) {
+          this.logger.warn(`Đã dùng nguồn dự phòng cho lịch Forex Factory`);
+        }
+        return events;
+      } catch (error) {
+        lastError = error;
+        if (index < urls.length - 1) {
+          this.logger.warn(
+            `Nguồn lịch chính không khả dụng, thử nguồn dự phòng: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    }
+
+    throw lastError ?? new Error('calendar provider unavailable');
+  }
+
+  private async readResponseBody(response: Response): Promise<unknown> {
+    // Tests use a small json-only fetch double; the real Fetch Response always
+    // exposes text(), which also lets us parse the proxy's JSON-in-markdown.
+    const testResponse = response as Response & {
+      text?: () => Promise<string>;
+    };
+    if (typeof testResponse.text === 'function') return testResponse.text();
+    return response.json();
+  }
+
+  private parseCalendarEvents(raw: unknown): unknown[] {
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw !== 'string') throw new Error('calendar payload is invalid');
+
+    const candidates = [raw.trim()];
+    const start = raw.indexOf('[');
+    const end = raw.lastIndexOf(']');
+    if (start >= 0 && end > start) candidates.push(raw.slice(start, end + 1));
+
+    for (const candidate of candidates) {
+      try {
+        const parsed: unknown = JSON.parse(candidate);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (_) {
+        // Try the next candidate when a proxy adds text around the JSON.
+      }
+    }
+    throw new Error('calendar payload is invalid');
   }
 
   private toImportantEvent(event: unknown) {

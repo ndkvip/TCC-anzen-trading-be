@@ -190,6 +190,45 @@ describe('RedNewsService calendar sync', () => {
     expect(saved).toHaveLength(1);
   });
 
+  it('uses the fallback feed when the calendar provider is rate limited', async () => {
+    const saved: RedNews[] = [];
+    const repository = {
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn((value: Partial<RedNews>) => value as RedNews),
+      save: jest.fn(async (value: RedNews) => {
+        saved.push(value);
+        return value;
+      }),
+      createQueryBuilder: jest.fn(() => ({
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 0 }),
+      })),
+    };
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 429 })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          `Title: [\n${JSON.stringify({
+            title: 'CPI m/m',
+            country: 'USD',
+            date: '2026-11-04T08:30:00-05:00',
+            impact: 'High',
+          })}\n]`,
+      });
+
+    const service = new RedNewsService(repository as never);
+    const result = await service.syncFromCalendar();
+
+    expect(result).toEqual({ synced: 1, skipped: false });
+    expect(saved[0]).toMatchObject({ title: 'CPI m/m', currency: 'USD' });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('defaults manual entries to USD so they appear on the public feed', async () => {
     const repository = {
       create: jest.fn((value: Partial<RedNews>) => value as RedNews),
