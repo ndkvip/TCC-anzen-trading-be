@@ -1,6 +1,7 @@
 import { JournalNotes20261012000000 } from './database/migrations/20261012000000-JournalNotes';
 import { PlanStatus20261014000000 } from './database/migrations/20261014000000-PlanStatus';
 import { RedNewsVisibilityOverride20261031000000 } from './database/migrations/20261031000000-RedNewsVisibilityOverride';
+import { RedNewsVisibilityRestore20261031010000 } from './database/migrations/20261031010000-RedNewsVisibilityRestore';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -64,6 +65,7 @@ import { AdminModule } from './admin/admin.module';
           JournalNotes20261012000000,
           PlanStatus20261014000000,
           RedNewsVisibilityOverride20261031000000,
+          RedNewsVisibilityRestore20261031010000,
         ],
         migrationsRun: config.get('DATABASE_MIGRATIONS_RUN', 'true') === 'true',
         synchronize: config.get('DATABASE_SYNCHRONIZE', 'false') === 'true',

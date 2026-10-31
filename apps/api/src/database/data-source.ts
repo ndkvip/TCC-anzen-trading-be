@@ -1,6 +1,7 @@
 import { JournalNotes20261012000000 } from './migrations/20261012000000-JournalNotes';
 import { PlanStatus20261014000000 } from './migrations/20261014000000-PlanStatus';
 import { RedNewsVisibilityOverride20261031000000 } from './migrations/20261031000000-RedNewsVisibilityOverride';
+import { RedNewsVisibilityRestore20261031010000 } from './migrations/20261031010000-RedNewsVisibilityRestore';
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { DailyCheckin } from '../checkins/checkin.entity';
@@ -47,6 +48,7 @@ export default new DataSource({
     JournalNotes20261012000000,
     PlanStatus20261014000000,
     RedNewsVisibilityOverride20261031000000,
+    RedNewsVisibilityRestore20261031010000,
   ],
   ssl:
     process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
