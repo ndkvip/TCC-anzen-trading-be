@@ -77,8 +77,8 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
     return this.news.find({ order: { releaseAt: 'ASC' } });
   }
 
-  async syncFromCalendar() {
-    if (!this.syncEnabled || this.syncInProgress)
+  async syncFromCalendar(options: { force?: boolean } = {}) {
+    if ((!this.syncEnabled && !options.force) || this.syncInProgress)
       return { synced: 0, skipped: true };
     this.syncInProgress = true;
     try {
@@ -162,7 +162,9 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
       this.news.create({
         title: dto.title.trim(),
         description: dto.description?.trim() || null,
-        currency: dto.currency?.trim() || null,
+        // Public Home currently exposes USD high-impact events. Keep manual
+        // fallback entries visible when the admin form omits the currency.
+        currency: dto.currency?.trim() || 'USD',
         impact: dto.impact ?? 'HIGH',
         releaseAt: new Date(dto.releaseAt),
         source: 'MANUAL',

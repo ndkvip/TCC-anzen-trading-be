@@ -36,7 +36,9 @@ export class RedNewsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   sync() {
-    return this.redNews.syncFromCalendar();
+    // A manual admin refresh must work even when the background timer is
+    // disabled in the service environment.
+    return this.redNews.syncFromCalendar({ force: true });
   }
 
   @Post()

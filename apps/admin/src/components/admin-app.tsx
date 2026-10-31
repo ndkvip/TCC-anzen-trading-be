@@ -2964,7 +2964,9 @@ function RedNewsPanel({ session }: { session: Session }) {
       const refreshed = await api.redNews(session.accessToken);
       setItems(refreshed);
       setMessage(
-        `Đã tự động cập nhật ${result.synced} tin quan trọng từ lịch kinh tế.`,
+        result.skipped
+          ? "Đồng bộ lịch kinh tế đang bị tắt trên máy chủ."
+          : `Đã tự động cập nhật ${result.synced} tin quan trọng từ lịch kinh tế.`,
       );
     } catch (error) {
       setMessage(
