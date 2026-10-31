@@ -102,12 +102,14 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
           where: { sourceKey: item.sourceKey },
         });
         if (existing) {
-          // Refresh calendar metadata but preserve an admin's manual hide switch.
+          // Refresh calendar metadata. Only an explicit admin override can
+          // keep an event hidden; old automatic expiry flags are recoverable.
           existing.title = item.title;
           existing.currency = item.currency;
           existing.impact = item.impact;
           existing.releaseAt = item.releaseAt;
           existing.source = item.source;
+          existing.isActive = existing.visibilityOverride !== false;
           await this.news.save(existing);
         } else {
           await this.news.save(this.news.create(item));
@@ -120,7 +122,8 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
           .update(RedNews)
           .set({ isActive: false })
           .where('source = :source', { source: 'FOREX_FACTORY_CALENDAR' })
-          .andWhere("release_at < NOW() - INTERVAL '2 days'")
+          .andWhere('visibility_override IS NULL')
+          .andWhere("release_at < NOW() - INTERVAL '7 days'")
           .execute();
       }
       this.logger.log(
@@ -169,6 +172,7 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
         currency: dto.currency?.trim() || 'USD',
         impact: dto.impact ?? 'HIGH',
         releaseAt: new Date(dto.releaseAt),
+        visibilityOverride: true,
         source: 'MANUAL',
         sourceKey: null,
       }),
@@ -184,7 +188,10 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
       item.description = dto.description.trim() || null;
     if (dto.currency !== undefined) item.currency = dto.currency.trim() || null;
     if (dto.releaseAt !== undefined) item.releaseAt = new Date(dto.releaseAt);
-    if (dto.isActive !== undefined) item.isActive = dto.isActive;
+    if (dto.isActive !== undefined) {
+      item.isActive = dto.isActive;
+      item.visibilityOverride = dto.isActive;
+    }
     return this.news.save(item);
   }
 

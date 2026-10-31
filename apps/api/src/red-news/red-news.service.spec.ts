@@ -70,6 +70,7 @@ describe('RedNewsService calendar sync', () => {
       impact: 'HIGH',
       source: 'FOREX_FACTORY_CALENDAR',
       sourceKey: 'ff:key',
+      visibilityOverride: null,
       description: null,
       releaseAt: new Date('2026-09-16T12:30:00.000Z'),
       isActive: false,
@@ -93,6 +94,49 @@ describe('RedNewsService calendar sync', () => {
           title: 'CPI m/m',
           country: 'USD',
           date: '2026-09-16T08:30:00-04:00',
+          impact: 'High',
+        },
+      ],
+    });
+
+    const service = new RedNewsService(repository as never);
+    await service.syncFromCalendar();
+
+    expect(existing.isActive).toBe(true);
+  });
+
+  it('keeps an explicitly hidden event hidden during a calendar refresh', async () => {
+    const existing = {
+      id: 'hidden-id',
+      title: 'Old title',
+      currency: 'USD',
+      impact: 'HIGH',
+      source: 'FOREX_FACTORY_CALENDAR',
+      sourceKey: 'ff:hidden',
+      visibilityOverride: false,
+      description: null,
+      releaseAt: new Date('2026-10-28T18:00:00.000Z'),
+      isActive: false,
+    } as RedNews;
+    const repository = {
+      findOne: jest.fn().mockResolvedValue(existing),
+      create: jest.fn((value: Partial<RedNews>) => value as RedNews),
+      save: jest.fn(async (value: RedNews) => value),
+      createQueryBuilder: jest.fn(() => ({
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 0 }),
+      })),
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          title: 'Federal Funds Rate',
+          country: 'USD',
+          date: '2026-10-28T14:00:00-04:00',
           impact: 'High',
         },
       ],
@@ -159,7 +203,7 @@ describe('RedNewsService calendar sync', () => {
     });
 
     expect(repository.create).toHaveBeenCalledWith(
-      expect.objectContaining({ currency: 'USD' }),
+      expect.objectContaining({ currency: 'USD', visibilityOverride: true }),
     );
   });
 

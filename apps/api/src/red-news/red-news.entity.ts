@@ -30,6 +30,10 @@ export class RedNews {
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;
 
+  // Null lets the calendar own visibility; a boolean records an admin choice.
+  @Column({ name: 'visibility_override', type: 'boolean', nullable: true })
+  visibilityOverride!: boolean | null;
+
   @Index()
   @Column({ type: 'varchar', default: 'MANUAL' })
   source!: 'MANUAL' | 'FOREX_FACTORY_CALENDAR';
