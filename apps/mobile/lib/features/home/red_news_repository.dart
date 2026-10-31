@@ -84,6 +84,38 @@ class RedNewsRepository {
   }
 }
 
+/// Keeps the last known calendar visible while the provider rolls over to a
+/// new week. Forex Factory publishes its calendar in a US timezone, so the
+/// feed can still contain the previous week when it is already Sunday locally.
+List<RedNewsItem> redNewsForHome(List<RedNewsItem> items, DateTime reference) {
+  final today = DateTime(reference.year, reference.month, reference.day);
+  // Forex Factory's weekly calendar runs Sunday through Saturday.
+  final sunday = today.subtract(
+    Duration(days: today.weekday % DateTime.daysPerWeek),
+  );
+  final nextSunday = sunday.add(const Duration(days: 7));
+
+  bool isVisible(RedNewsItem item) {
+    final release = item.releaseAt;
+    return item.isActive &&
+        !release.isBefore(sunday) &&
+        release.isBefore(nextSunday);
+  }
+
+  final currentWeek = items.where(isVisible).toList();
+  if (currentWeek.isNotEmpty) return currentWeek;
+
+  // At local week rollover the upstream feed may still be serving the prior
+  // US week. Avoid an empty Home section until the next sync arrives.
+  final recentStart = sunday.subtract(const Duration(days: 7));
+  return items.where((item) {
+    final release = item.releaseAt;
+    return item.isActive &&
+        !release.isBefore(recentStart) &&
+        release.isBefore(nextSunday);
+  }).toList();
+}
+
 List<RedNewsItem> sampleRedNewsForWeek(DateTime reference) {
   final date = DateTime(reference.year, reference.month, reference.day);
   final monday = date.subtract(Duration(days: date.weekday - DateTime.monday));

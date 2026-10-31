@@ -8,9 +8,25 @@ import 'package:http/testing.dart';
 import 'package:ttc_ict_mobile/core/network/api_client.dart';
 import 'package:ttc_ict_mobile/core/theme/app_theme.dart';
 import 'package:ttc_ict_mobile/features/home/red_news_repository.dart';
+import 'package:ttc_ict_mobile/features/home/red_news_model.dart';
 import 'package:ttc_ict_mobile/features/home/red_news_widgets.dart';
 
 void main() {
+  test('keeps the last known events visible during local Sunday rollover', () {
+    final items = [
+      RedNewsItem(
+        id: 'old-week',
+        title: 'Federal Funds Rate',
+        currency: 'USD',
+        releaseAt: DateTime.utc(2026, 10, 29, 12, 30),
+      ),
+    ];
+
+    final visible = redNewsForHome(items, DateTime(2026, 11, 1, 0, 5));
+
+    expect(visible.map((item) => item.id), ['old-week']);
+  });
+
   test(
     'successful refresh time survives offline restart and empty news',
     () async {

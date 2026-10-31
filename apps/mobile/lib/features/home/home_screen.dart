@@ -103,21 +103,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _loadRedNews() async {
     final items = await _redNewsRepository.load();
     if (!mounted) return;
-    final today = DateTime.now();
-    // Forex Factory's weekly calendar runs Sunday through Saturday.
-    // Matching that window also keeps next week's events visible on Sunday.
-    final sunday = DateTime(
-      today.year,
-      today.month,
-      today.day,
-    ).subtract(Duration(days: today.weekday % DateTime.daysPerWeek));
-    final nextSunday = sunday.add(const Duration(days: 7));
-    final weeklyItems = items.where((item) {
-      final release = item.releaseAt;
-      return item.isActive &&
-          !release.isBefore(sunday) &&
-          release.isBefore(nextSunday);
-    }).toList();
+    final weeklyItems = redNewsForHome(items, DateTime.now());
     setState(() {
       _redNews = weeklyItems;
       _lastRedNewsRefresh = _redNewsRepository.lastUpdated;
