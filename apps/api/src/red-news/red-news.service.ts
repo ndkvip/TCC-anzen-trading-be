@@ -23,6 +23,7 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedNewsService.name);
   private syncTimer?: ReturnType<typeof setInterval>;
   private syncInProgress = false;
+  private lastPublicRefreshAttemptAt?: number;
 
   constructor(
     @InjectRepository(RedNews)
@@ -70,8 +71,8 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  listPublic() {
-    return this.news.find({
+  async listPublic() {
+    const options = {
       where: {
         isActive: true,
         currency: Raw((alias) => `UPPER(TRIM(${alias})) = :publicCurrency`, {
@@ -79,7 +80,28 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
         }),
       },
       order: { releaseAt: 'ASC' },
-    });
+    } as const;
+    const records = await this.news.find(options);
+
+    // Render's free service can sleep between calendar refreshes. If the
+    // public feed only contains past events, refresh once on demand so the
+    // first mobile request after wake-up can schedule the next reminder.
+    const now = Date.now();
+    const shouldRefresh =
+      records.length > 0 &&
+      !records.some((item) => item.releaseAt.getTime() > now) &&
+      (this.lastPublicRefreshAttemptAt === undefined ||
+        now - this.lastPublicRefreshAttemptAt >= 5 * 60_000);
+    if (shouldRefresh) {
+      this.lastPublicRefreshAttemptAt = now;
+      // The public feed is also the wake-up path for the free Render service;
+      // force a refresh here so an old env flag cannot leave mobile with only
+      // last week's calendar forever.
+      await this.syncFromCalendar({ force: true });
+      return this.news.find(options);
+    }
+
+    return records;
   }
 
   listAdmin() {

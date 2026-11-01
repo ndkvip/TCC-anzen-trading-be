@@ -263,4 +263,50 @@ describe('RedNewsService calendar sync', () => {
       publicCurrency: 'USD',
     });
   });
+
+  it('refreshes the public feed when all existing events are in the past', async () => {
+    const repository = {
+      find: jest
+        .fn()
+        .mockResolvedValueOnce([
+          {
+            releaseAt: new Date('2026-10-29T12:30:00.000Z'),
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            title: 'Non-Farm Employment Change',
+            releaseAt: new Date('2026-11-06T13:30:00.000Z'),
+          },
+        ]),
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn((value: Partial<RedNews>) => value as RedNews),
+      save: jest.fn(async (value: RedNews) => value),
+      createQueryBuilder: jest.fn(() => ({
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({ affected: 0 }),
+      })),
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          title: 'Non-Farm Employment Change',
+          country: 'USD',
+          date: '2026-11-06T08:30:00-05:00',
+          impact: 'High',
+        },
+      ],
+    });
+
+    const service = new RedNewsService(repository as never);
+    const result = await service.listPublic();
+
+    expect(result[0].title).toBe('Non-Farm Employment Change');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(repository.find).toHaveBeenCalledTimes(2);
+  });
 });
