@@ -207,22 +207,47 @@ export class RedNewsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private parseCalendarEvents(raw: unknown): unknown[] {
-    if (Array.isArray(raw)) return raw;
-    if (typeof raw !== 'string') throw new Error('calendar payload is invalid');
+    // The fallback proxy wraps the upstream array in an envelope whose
+    // `data.content` value is itself a JSON string. Walk those layers while
+    // retaining support for the direct JSON and markdown responses used by
+    // older deployments and tests.
+    const queue: unknown[] = [raw];
+    const visited = new Set<unknown>();
 
-    const candidates = [raw.trim()];
-    const start = raw.indexOf('[');
-    const end = raw.lastIndexOf(']');
-    if (start >= 0 && end > start) candidates.push(raw.slice(start, end + 1));
+    while (queue.length > 0 && visited.size < 50) {
+      const candidate = queue.shift();
+      if (candidate === null || candidate === undefined) continue;
+      if (typeof candidate === 'object' && visited.has(candidate)) continue;
+      if (typeof candidate === 'object') visited.add(candidate);
 
-    for (const candidate of candidates) {
-      try {
-        const parsed: unknown = JSON.parse(candidate);
-        if (Array.isArray(parsed)) return parsed;
-      } catch (_) {
-        // Try the next candidate when a proxy adds text around the JSON.
+      if (Array.isArray(candidate)) return candidate;
+
+      if (typeof candidate === 'string') {
+        const text = candidate.trim();
+        if (!text) continue;
+
+        const textCandidates = [text];
+        const start = text.indexOf('[');
+        const end = text.lastIndexOf(']');
+        if (start >= 0 && end > start) {
+          textCandidates.push(text.slice(start, end + 1));
+        }
+
+        for (const textCandidate of textCandidates) {
+          try {
+            queue.push(JSON.parse(textCandidate));
+          } catch (_) {
+            // Try the next candidate when a proxy adds text around the JSON.
+          }
+        }
+        continue;
+      }
+
+      if (typeof candidate === 'object') {
+        for (const value of Object.values(candidate)) queue.push(value);
       }
     }
+
     throw new Error('calendar payload is invalid');
   }
 
