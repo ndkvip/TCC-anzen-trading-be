@@ -16,4 +16,20 @@ describe('TradingPlan persistence mapping', () => {
         ?.options.name,
     ).toBe('timeframe_pairs');
   });
+
+  it('uniquely identifies a user plan by asset and period', () => {
+    const storage = getMetadataArgsStorage();
+    const indexes = storage.indices.filter(
+      (index) => index.target === TradingPlan,
+    );
+    expect(
+      indexes.filter((index) => index.unique).map((index) => index.columns),
+    ).toEqual([['userId', 'symbol', 'scope', 'periodKey']]);
+    const symbol = storage.columns.find(
+      (column) =>
+        column.target === TradingPlan && column.propertyName === 'symbol',
+    );
+    expect(symbol?.options.default).toBe('GENERAL');
+    expect(symbol?.options.length).toBe(30);
+  });
 });

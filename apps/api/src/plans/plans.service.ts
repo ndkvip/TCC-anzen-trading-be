@@ -2,9 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PlanScope, PlanStatus, TradingPlan } from './plan.entity';
+import { normalizePlanSymbol } from './plan-symbol';
 export type PlanInput = Partial<
   Pick<
     TradingPlan,
+    | 'symbol'
     | 'scope'
     | 'periodKey'
     | 'title'
@@ -20,21 +22,34 @@ export class PlansService {
     @InjectRepository(TradingPlan)
     private readonly repo: Repository<TradingPlan>,
   ) {}
-  async list(userId: string, scope?: PlanScope) {
+  async list(userId: string, scope?: PlanScope, symbol?: string) {
     return this.repo.find({
-      where: scope ? { userId, scope } : { userId },
+      where: {
+        userId,
+        ...(scope ? { scope } : {}),
+        ...(symbol === undefined
+          ? {}
+          : { symbol: normalizePlanSymbol(symbol) }),
+      },
       order: { periodKey: 'DESC' },
     });
   }
-  async get(userId: string, scope: PlanScope, periodKey: string) {
+  async get(
+    userId: string,
+    scope: PlanScope,
+    periodKey: string,
+    asset?: string,
+  ) {
+    const symbol = normalizePlanSymbol(asset);
     const row = await this.repo.findOne({
-      where: { userId, scope, periodKey },
+      where: { userId, symbol, scope, periodKey },
     });
     if (row) return row;
-    const inherited = await this.inherited(userId, scope, periodKey);
+    const inherited = await this.inherited(userId, symbol, scope, periodKey);
     return {
-      id: `draft-${scope}-${periodKey}`,
+      id: `draft-${encodeURIComponent(symbol)}-${scope}-${periodKey}`,
       userId,
+      symbol,
       scope,
       periodKey,
       title: this.title(scope, periodKey),
@@ -47,10 +62,13 @@ export class PlansService {
     };
   }
   async upsert(userId: string, input: PlanInput) {
+    const symbol = normalizePlanSymbol(input.symbol);
     const scope = input.scope ?? PlanScope.DAY;
     const periodKey = input.periodKey ?? new Date().toISOString().slice(0, 10);
-    let row = await this.repo.findOne({ where: { userId, scope, periodKey } });
-    row ??= this.repo.create({ userId, scope, periodKey });
+    let row = await this.repo.findOne({
+      where: { userId, symbol, scope, periodKey },
+    });
+    row ??= this.repo.create({ userId, symbol, scope, periodKey });
     Object.assign(row, {
       title: input.title ?? this.title(scope, periodKey),
       status: input.status ?? row.status ?? PlanStatus.DRAFT,
@@ -58,7 +76,7 @@ export class PlansService {
       timeframePairs: input.timeframePairs ?? [],
       imageUrls: input.imageUrls ?? [],
     });
-    const inherited = await this.inherited(userId, scope, periodKey);
+    const inherited = await this.inherited(userId, symbol, scope, periodKey);
     row.inheritedPlanId = inherited?.id ?? null;
     return this.repo.save(row);
   }
@@ -68,26 +86,52 @@ export class PlansService {
     await this.repo.remove(row);
     return { success: true };
   }
-  adminList(userId?: string) {
+  adminList(userId?: string, symbol?: string) {
     return this.repo.find({
-      where: userId ? { userId } : {},
+      where: {
+        ...(userId ? { userId } : {}),
+        ...(symbol === undefined
+          ? {}
+          : { symbol: normalizePlanSymbol(symbol) }),
+      },
       order: { updatedAt: 'DESC' },
       take: 300,
     });
   }
-  private async inherited(userId: string, scope: PlanScope, key: string) {
+  private async inherited(
+    userId: string,
+    symbol: string,
+    scope: PlanScope,
+    key: string,
+  ) {
     if (scope === PlanScope.MONTH) return null;
     if (scope === PlanScope.WEEK)
       return this.repo.findOne({
-        where: { userId, scope: PlanScope.MONTH, periodKey: key.slice(0, 7) },
+        where: {
+          userId,
+          symbol,
+          scope: PlanScope.MONTH,
+          periodKey: key.slice(0, 7),
+        },
       });
     const date = new Date(`${key}T12:00:00Z`);
     const monday = new Date(date);
     monday.setUTCDate(date.getUTCDate() - (date.getUTCDay() || 7) + 1);
     const weekKey = monday.toISOString().slice(0, 10);
-    return this.repo.findOne({
-      where: { userId, scope: PlanScope.WEEK, periodKey: weekKey },
+    const week = await this.repo.findOne({
+      where: { userId, symbol, scope: PlanScope.WEEK, periodKey: weekKey },
     });
+    return (
+      week ??
+      this.repo.findOne({
+        where: {
+          userId,
+          symbol,
+          scope: PlanScope.MONTH,
+          periodKey: weekKey.slice(0, 7),
+        },
+      })
+    );
   }
   private title(scope: PlanScope, key: string) {
     if (scope === PlanScope.MONTH)

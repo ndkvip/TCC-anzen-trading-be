@@ -12,9 +12,13 @@ export type FeaturedTradeBlock = {
   imageUrl?: string;
 };
 
+export type ArticlePlacement = 'FEATURED_TRADE' | 'HOME_POST';
+
 @Entity({ name: 'featured_trades' })
 export class FeaturedTrade {
   @PrimaryGeneratedColumn('uuid') id!: string;
+  @Column({ type: 'varchar', default: 'FEATURED_TRADE' })
+  placement!: ArticlePlacement;
   @Column({ name: 'week_start', type: 'date' }) weekStart!: string;
   @Column({ type: 'varchar', default: '' }) title!: string;
   @Column({ type: 'text', nullable: true }) summary!: string | null;

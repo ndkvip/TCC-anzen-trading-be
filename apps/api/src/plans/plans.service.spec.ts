@@ -18,7 +18,13 @@ function repo(rows: any[] = []) {
       else rows.push(v);
       return v;
     }),
-    remove: jest.fn(async (v: any) => v),
+    remove: jest.fn(async (v: any) => {
+      rows.splice(
+        rows.findIndex((row) => row.id === v.id),
+        1,
+      );
+      return v;
+    }),
   };
 }
 describe('PlansService Phase 3', () => {
@@ -79,4 +85,93 @@ describe('PlansService Phase 3', () => {
       PlanStatus.COMPLETED,
     );
   });
+
+  it('stores multiple assets for one period and normalizes symbols on every lookup', async () => {
+    const s = new PlansService(repo() as never);
+    const input = { scope: PlanScope.DAY, periodKey: '2026-11-13' };
+    const gold = await s.upsert('u1', {
+      ...input,
+      symbol: ' xauusd ',
+      title: 'Gold',
+    });
+    const btc = await s.upsert('u1', {
+      ...input,
+      symbol: 'BTCUSDT',
+      title: 'Bitcoin',
+    });
+    const legacy = await s.upsert('u1', { ...input, title: 'Legacy' });
+    expect(new Set([gold.id, btc.id, legacy.id]).size).toBe(3);
+    expect(gold.symbol).toBe('XAUUSD');
+    expect(legacy.symbol).toBe('GENERAL');
+    expect((await s.list('u1')).length).toBe(3);
+    expect(await s.list('u1', PlanScope.DAY, ' xauusd ')).toEqual([gold]);
+    expect(await s.adminList('u1', 'btcusdt')).toEqual([btc]);
+    expect((await s.get('u1', PlanScope.DAY, input.periodKey)).id).toBe(
+      legacy.id,
+    );
+    await s.upsert('u1', { ...input, symbol: 'XAUUSD', title: 'Updated gold' });
+    expect(
+      (await s.get('u1', PlanScope.DAY, input.periodKey, 'BTCUSDT')).title,
+    ).toBe('Bitcoin');
+    expect(
+      (await s.get('u1', PlanScope.DAY, input.periodKey, 'GENERAL')).title,
+    ).toBe('Legacy');
+    await expect(s.remove('u2', btc.id)).rejects.toThrow();
+    await s.remove('u1', gold.id);
+    expect((await s.list('u1')).map((row) => row.id)).toEqual([
+      btc.id,
+      legacy.id,
+    ]);
+  });
+
+  it('inherits within the same asset only, including a virtual week and a month boundary', async () => {
+    const s = new PlansService(repo() as never);
+    const month = await s.upsert('u1', {
+      scope: PlanScope.MONTH,
+      periodKey: '2026-10',
+      symbol: 'XAUUSD',
+      contentDelta: [{ insert: 'Gold month' }],
+    });
+    await s.upsert('u1', {
+      scope: PlanScope.MONTH,
+      periodKey: '2026-10',
+      symbol: 'GENERAL',
+      contentDelta: [{ insert: 'Legacy month' }],
+    });
+    await s.upsert('u2', {
+      scope: PlanScope.WEEK,
+      periodKey: '2026-10-26',
+      symbol: 'BTCUSDT',
+      contentDelta: [{ insert: 'Other user' }],
+    });
+    const gold = await s.get('u1', PlanScope.DAY, '2026-11-01', 'XAUUSD');
+    expect(gold.inheritedPlanId).toBe(month.id);
+    expect(gold.contentDelta).toEqual([{ insert: 'Gold month' }]);
+    const bitcoin = await s.get('u1', PlanScope.DAY, '2026-11-01', 'BTCUSDT');
+    expect(bitcoin.inheritedPlanId).toBeNull();
+    expect(bitcoin.contentDelta).toEqual([]);
+    expect(bitcoin.symbol).toBe('BTCUSDT');
+    expect(bitcoin.id).not.toBe(gold.id);
+    const week = await s.upsert('u1', {
+      scope: PlanScope.WEEK,
+      periodKey: '2026-10-26',
+      symbol: 'XAUUSD',
+      contentDelta: [{ insert: 'Gold week' }],
+    });
+    expect(
+      (await s.get('u1', PlanScope.DAY, '2026-11-01', 'XAUUSD'))
+        .inheritedPlanId,
+    ).toBe(week.id);
+  });
+
+  it.each(['', ' ', '../foo', 'BTC USD', 'X'.repeat(31), null, ['BTCUSDT']])(
+    'rejects invalid asset %p without writing',
+    async (symbol) => {
+      const r = repo();
+      const s = new PlansService(r as never);
+      // A leading dot is invalid; separators are allowed only after the first character.
+      await expect(s.upsert('u1', { symbol } as never)).rejects.toThrow();
+      expect(r.save).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -8,40 +8,34 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthRequestUser } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../users/user.entity';
-import { PlanScope, PlanStatus } from './plan.entity';
+import {
+  AdminPlanQueryDto,
+  PlanDto,
+  PlanListQueryDto,
+  PlanResolveQueryDto,
+} from './plan.dto';
 import { PlansService } from './plans.service';
-class PlanDto {
-  @IsOptional() @IsEnum(PlanScope) scope?: PlanScope;
-  @IsOptional() @IsString() periodKey?: string;
-  @IsOptional() @IsString() title?: string;
-  @IsOptional() @IsEnum(PlanStatus) status?: PlanStatus;
-  @IsOptional() @IsArray() contentDelta?: Record<string, unknown>[];
-  @IsOptional() @IsArray() timeframePairs?: string[];
-  @IsOptional() @IsArray() imageUrls?: string[];
-}
 @Controller('plans')
 @UseGuards(JwtAuthGuard)
 export class PlansController {
   constructor(private readonly service: PlansService) {}
   @Get() list(
     @CurrentUser() u: AuthRequestUser,
-    @Query('scope') scope?: PlanScope,
+    @Query() query: PlanListQueryDto,
   ) {
-    return this.service.list(u.sub, scope);
+    return this.service.list(u.sub, query.scope, query.symbol);
   }
   @Get('resolve') get(
     @CurrentUser() u: AuthRequestUser,
-    @Query('scope') scope: PlanScope,
-    @Query('periodKey') key: string,
+    @Query() query: PlanResolveQueryDto,
   ) {
-    return this.service.get(u.sub, scope, key);
+    return this.service.get(u.sub, query.scope, query.periodKey, query.symbol);
   }
   @Put() upsert(@CurrentUser() u: AuthRequestUser, @Body() dto: PlanDto) {
     return this.service.upsert(u.sub, dto);
@@ -53,8 +47,8 @@ export class PlansController {
     return this.service.remove(u.sub, id);
   }
   @Get('admin/all') @UseGuards(RolesGuard) @Roles(UserRole.ADMIN) admin(
-    @Query('userId') userId?: string,
+    @Query() query: AdminPlanQueryDto,
   ) {
-    return this.service.adminList(userId);
+    return this.service.adminList(query.userId, query.symbol);
   }
 }

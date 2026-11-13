@@ -7,7 +7,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateFeaturedTradeDto } from './dto/create-featured-trade.dto';
 import { UpdateFeaturedTradeDto } from './dto/update-featured-trade.dto';
-import { FeaturedTrade, FeaturedTradeBlock } from './featured-trade.entity';
+import {
+  ArticlePlacement,
+  FeaturedTrade,
+  FeaturedTradeBlock,
+} from './featured-trade.entity';
+import { CreateArticleDto } from './dto/article.dto';
 import { FeaturedTradeImagesService } from './featured-trade-images.service';
 
 @Injectable()
@@ -21,24 +26,52 @@ export class FeaturedTradeService {
   publicForWeek(weekStart?: string) {
     if (!weekStart) return [];
     return this.repo.find({
-      where: { weekStart, isActive: true },
+      where: { weekStart, isActive: true, placement: 'FEATURED_TRADE' },
       order: { createdAt: 'DESC' },
     });
   }
 
-  adminList() {
-    return this.repo.find({ order: { weekStart: 'DESC', updatedAt: 'DESC' } });
+  publicHomePosts() {
+    return this.repo.find({
+      where: { placement: 'HOME_POST', isActive: true },
+      order: { createdAt: 'DESC', id: 'DESC' },
+    });
   }
 
-  async create(dto: CreateFeaturedTradeDto) {
-    const value = this.normalize(dto);
+  adminList(placement: ArticlePlacement = 'FEATURED_TRADE') {
+    return this.repo.find({
+      where: { placement },
+      order:
+        placement === 'HOME_POST'
+          ? { createdAt: 'DESC', id: 'DESC' }
+          : { weekStart: 'DESC', updatedAt: 'DESC' },
+    });
+  }
+
+  createHomePost(dto: CreateArticleDto) {
+    // Home posts stay visible until hidden; this legacy storage key is not a filter.
+    return this.create(
+      { ...dto, weekStart: new Date().toISOString().slice(0, 10) },
+      'HOME_POST',
+    );
+  }
+
+  async create(
+    dto: CreateFeaturedTradeDto,
+    placement: ArticlePlacement = 'FEATURED_TRADE',
+  ) {
+    const value = { ...this.normalize(dto), placement };
     this.validateArticle(value);
     return this.repo.save(this.repo.create(value));
   }
 
-  async update(id: string, dto: UpdateFeaturedTradeDto) {
-    const item = await this.repo.findOne({ where: { id } });
-    if (!item) throw new NotFoundException('Giao dịch nổi bật không tồn tại');
+  async update(
+    id: string,
+    dto: UpdateFeaturedTradeDto,
+    placement: ArticlePlacement = 'FEATURED_TRADE',
+  ) {
+    const item = await this.repo.findOne({ where: { id, placement } });
+    if (!item) throw new NotFoundException('Bài viết không tồn tại');
     const next = this.normalize(dto);
     this.validateArticle({ ...item, ...next });
     const nextUrls = this.allImageUrls(next, item);
@@ -51,9 +84,9 @@ export class FeaturedTradeService {
     return saved;
   }
 
-  async remove(id: string) {
-    const item = await this.repo.findOne({ where: { id } });
-    if (!item) throw new NotFoundException('Giao dịch nổi bật không tồn tại');
+  async remove(id: string, placement: ArticlePlacement = 'FEATURED_TRADE') {
+    const item = await this.repo.findOne({ where: { id, placement } });
+    if (!item) throw new NotFoundException('Bài viết không tồn tại');
     const urls = this.allImageUrls(item);
     await this.repo.remove(item);
     await this.images.remove(await this.unreferencedUrls(urls));

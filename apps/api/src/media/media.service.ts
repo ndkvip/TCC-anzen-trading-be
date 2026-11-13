@@ -120,7 +120,10 @@ export class MediaService {
     if (!urls.length) return;
     const assets = await this.repo.find({
       where: {
-        contextType: MediaContextType.FEATURED_TRADE,
+        contextType: In([
+          MediaContextType.FEATURED_TRADE,
+          MediaContextType.HOME_POST,
+        ]),
         remoteUrl: In(urls),
       },
     });
@@ -134,7 +137,10 @@ export class MediaService {
     const asset = await this.repo.findOne({
       where: {
         driveFileId: fileId,
-        contextType: MediaContextType.FEATURED_TRADE,
+        contextType: In([
+          MediaContextType.FEATURED_TRADE,
+          MediaContextType.HOME_POST,
+        ]),
       },
     });
     if (!asset)
@@ -183,6 +189,15 @@ export class MediaService {
       );
     }
     const contextType = input.contextType ?? MediaContextType.GENERAL;
+    if (
+      [MediaContextType.FEATURED_TRADE, MediaContextType.HOME_POST].includes(
+        contextType,
+      ) &&
+      actor.role !== UserRole.ADMIN
+    )
+      throw new ForbiddenException(
+        'Chỉ quản trị viên được đăng ảnh cho bản tin',
+      );
     const learningMedia = [
       MediaContextType.LEARNING_LESSON,
       MediaContextType.LEARNING_QUESTION,
@@ -300,6 +315,15 @@ export class MediaService {
 
   async register(actor: AuthRequestUser, input: RegisterMediaInput) {
     const contextType = input.contextType ?? MediaContextType.GENERAL;
+    if (
+      [MediaContextType.FEATURED_TRADE, MediaContextType.HOME_POST].includes(
+        contextType,
+      ) &&
+      actor.role !== UserRole.ADMIN
+    )
+      throw new ForbiddenException(
+        'Chỉ quản trị viên được đăng ảnh cho bản tin',
+      );
     const learningMedia = [
       MediaContextType.LEARNING_LESSON,
       MediaContextType.LEARNING_QUESTION,

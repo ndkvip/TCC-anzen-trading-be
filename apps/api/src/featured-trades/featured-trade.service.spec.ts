@@ -14,14 +14,16 @@ function fixture() {
       else rows[index] = value;
       return value;
     }),
-    findOne: async ({ where }: { where: { id: string } }) =>
-      rows.find((row) => row.id === where.id),
+    findOne: async ({ where }: { where: Partial<FeaturedTrade> }) =>
+      rows.find((row) =>
+        Object.entries(where).every(([key, value]) => row[key] === value),
+      ),
     find: jest.fn(async (options?: { where: Partial<FeaturedTrade> }) =>
       options?.where
-        ? rows.filter(
-            (row) =>
-              row.weekStart === options.where.weekStart &&
-              row.isActive === options.where.isActive,
+        ? rows.filter((row) =>
+            Object.entries(options.where).every(
+              ([key, value]) => row[key] === value,
+            ),
           )
         : rows,
     ),
@@ -124,5 +126,64 @@ describe('FeaturedTrade articles', () => {
       }),
     ).rejects.toThrow('DB unavailable');
     expect(images.remove).not.toHaveBeenCalled();
+  });
+
+  it('keeps home posts and weekly trades in separate public/admin lists', async () => {
+    const { service, repo } = fixture();
+    const trade = await service.create(article());
+    const post = await service.createHomePost(article('Home news'));
+    expect(post.placement).toBe('HOME_POST');
+    expect(trade.placement).toBe('FEATURED_TRADE');
+    expect(await service.publicForWeek(trade.weekStart)).toEqual([trade]);
+    expect(await service.publicHomePosts()).toEqual([post]);
+    expect(repo.find).toHaveBeenLastCalledWith({
+      where: { placement: 'HOME_POST', isActive: true },
+      order: { createdAt: 'DESC', id: 'DESC' },
+    });
+    expect(await service.adminList()).toEqual([trade]);
+    expect(await service.adminList('HOME_POST')).toEqual([post]);
+  });
+
+  it('home posts remain visible across weeks until hidden, and may be republished', async () => {
+    const { service } = fixture();
+    const post = await service.createHomePost(article());
+    post.weekStart = '2020-01-06';
+    expect(await service.publicHomePosts()).toEqual([post]);
+    await service.update(post.id, { isActive: false }, 'HOME_POST');
+    expect(await service.publicHomePosts()).toEqual([]);
+    expect(await service.adminList('HOME_POST')).toHaveLength(1);
+    await service.update(post.id, { isActive: true }, 'HOME_POST');
+    expect(await service.publicHomePosts()).toEqual([post]);
+  });
+
+  it('cannot edit/delete another placement even with a known ID', async () => {
+    const { service } = fixture();
+    const post = await service.createHomePost(article());
+    const trade = await service.create(article());
+    await expect(service.update(post.id, { title: 'Wrong' })).rejects.toThrow(
+      'không tồn tại',
+    );
+    await expect(service.remove(post.id)).rejects.toThrow('không tồn tại');
+    await expect(
+      service.update(trade.id, { title: 'Wrong' }, 'HOME_POST'),
+    ).rejects.toThrow('không tồn tại');
+    await expect(service.remove(trade.id, 'HOME_POST')).rejects.toThrow(
+      'không tồn tại',
+    );
+    expect(post.title).toBe('BTC');
+    expect(await service.adminList()).toEqual([trade]);
+    expect(await service.adminList('HOME_POST')).toEqual([post]);
+  });
+
+  it('retains shared media across placements until the last reference is deleted', async () => {
+    const { service, images } = fixture();
+    const trade = await service.create(article());
+    const post = await service.createHomePost(article());
+    await service.remove(trade.id);
+    expect(images.remove).toHaveBeenLastCalledWith([]);
+    await service.remove(post.id, 'HOME_POST');
+    expect(images.remove).toHaveBeenLastCalledWith([
+      'https://example.test/chart.webp',
+    ]);
   });
 });

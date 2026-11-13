@@ -6,10 +6,11 @@ import { FeaturedTradeController } from './featured-trade.controller';
 import { FeaturedTrade } from './featured-trade.entity';
 import { FeaturedTradeService } from './featured-trade.service';
 import { FeaturedTradeImagesService } from './featured-trade-images.service';
+import { HomePostsController } from './home-posts.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([FeaturedTrade]), AuthModule, MediaModule],
-  controllers: [FeaturedTradeController],
+  controllers: [FeaturedTradeController, HomePostsController],
   providers: [FeaturedTradeService, FeaturedTradeImagesService],
 })
 export class FeaturedTradesModule {}

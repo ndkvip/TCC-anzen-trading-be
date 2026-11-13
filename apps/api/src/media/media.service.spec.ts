@@ -340,7 +340,29 @@ describe('MediaService Drive folder routing', () => {
         journal: 'Nhật ký giao dịch/{userId}',
         plan: 'Plan giao dịch/{userId}',
         featuredTrade: 'Tin quan trọng trong tuần',
+        homePost: 'Bản tin trang chủ',
       },
     });
+  });
+
+  it('stores home news in its own Drive folder and serves it through the public image route', async () => {
+    const { media } = service();
+    const registered = await media.register(actor('admin', UserRole.ADMIN), {
+      contextType: MediaContextType.HOME_POST,
+      driveFileId: 'home-cover',
+      remoteUrl: 'https://drive.google.com/uc?id=home-cover',
+    });
+    expect(registered.folderPath).toBe('Bản tin trang chủ');
+    expect(registered.contextId).toBeNull();
+    expect(await media.downloadFeaturedImage('home-cover')).toEqual({
+      buffer: Buffer.from('image-bytes'),
+      mimeType: 'image/webp',
+    });
+    await expect(
+      media.register(actor('student'), {
+        contextType: MediaContextType.HOME_POST,
+        remoteUrl: 'https://example.test/private.png',
+      }),
+    ).rejects.toThrow(ForbiddenException);
   });
 });

@@ -27,6 +27,9 @@ export class FeaturedTradeImagesService {
   async upload(
     files: Express.Multer.File[] | undefined,
     actorOrLegacyWeek?: AuthRequestUser | string,
+    contextType:
+      | MediaContextType.FEATURED_TRADE
+      | MediaContextType.HOME_POST = MediaContextType.FEATURED_TRADE,
   ) {
     if (!files?.length) {
       throw new BadRequestException('Vui lòng chọn ít nhất một hình ảnh');
@@ -47,7 +50,7 @@ export class FeaturedTradeImagesService {
             {
               name: file.originalname || `tin-quan-trong-${Date.now()}.webp`,
               mimeType: 'image/webp',
-              contextType: MediaContextType.FEATURED_TRADE,
+              contextType,
             },
             file.buffer,
           );

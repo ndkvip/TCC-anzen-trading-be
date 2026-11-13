@@ -16,10 +16,15 @@ export enum PlanStatus {
   COMPLETED = 'COMPLETED',
 }
 @Entity({ name: 'trading_plans' })
-@Index(['userId', 'scope', 'periodKey'], { unique: true })
+@Index(
+  'UQ_trading_plans_user_symbol_period',
+  ['userId', 'symbol', 'scope', 'periodKey'],
+  { unique: true },
+)
 export class TradingPlan {
   @PrimaryGeneratedColumn('uuid') id!: string;
   @Column({ name: 'user_id', type: 'uuid' }) userId!: string;
+  @Column({ length: 30, default: 'GENERAL' }) symbol!: string;
   @Column({ type: 'enum', enum: PlanScope }) scope!: PlanScope;
   @Column({ name: 'period_key' }) periodKey!: string;
   @Column() title!: string;

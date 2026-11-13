@@ -7,6 +7,7 @@ export enum MediaContextType {
   JOURNAL = 'JOURNAL',
   PLAN = 'PLAN',
   FEATURED_TRADE = 'FEATURED_TRADE',
+  HOME_POST = 'HOME_POST',
   GENERAL = 'GENERAL',
 }
 
@@ -76,6 +77,8 @@ export function resolveMediaFolder(
         contextId: null,
         folderPath: 'Tin quan trọng trong tuần',
       };
+    case MediaContextType.HOME_POST:
+      return { contextType, contextId: null, folderPath: 'Bản tin trang chủ' };
     default:
       return {
         contextType: MediaContextType.GENERAL,
@@ -94,4 +97,5 @@ export const driveFolderLayout = {
   journal: 'Nhật ký giao dịch/{userId}',
   plan: 'Plan giao dịch/{userId}',
   featuredTrade: 'Tin quan trọng trong tuần',
+  homePost: 'Bản tin trang chủ',
 } as const;
